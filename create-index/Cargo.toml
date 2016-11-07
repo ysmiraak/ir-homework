@@ -1,0 +1,7 @@
+[package]
+name = "create-index"
+version = "0.1.0"
+authors = ["Ysmiraak <ysmiraak@gmail.com>"]
+
+[dependencies]
+conllx = "0.3.1"
