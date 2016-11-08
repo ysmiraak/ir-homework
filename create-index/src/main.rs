@@ -7,23 +7,23 @@ use std::io::Write;
 use conllx::Reader;
 use std::collections::HashMap;
 use std::hash::Hash;
-use std::hash::BuildHasher;
 
 trait SortedSet<T:Ord+Copy> {
-    fn add(&mut self, item:T);
+    fn grow(self, item:T) -> Self;
 }
 
 impl<T> SortedSet<T> for Vec<T> where T:Ord+Copy {
-    fn add(&mut self, item:T) {
+    fn grow(mut self, item:T) -> Self {
         match self.binary_search(&item) {
             Ok(_) => (),
-            Err(idx) => self.insert(idx, item),
+            Err(idx) => self.insert(idx, item)
         };
+        self
     }
 }
 
-fn update<K,V,S,X>(mut m:HashMap<K,V,S>, k:K, f:&Fn(Option<V>,X) -> V, x:X) -> HashMap<K,V,S>
-    where K:Hash+Eq, S:BuildHasher {
+fn update<K,V,X>(mut m:HashMap<K,V>, k:K, f:&Fn(Option<V>,X) -> V, x:X) -> HashMap<K,V>
+    where K:Hash+Eq {
     let v = m.remove(&k);
     m.insert(k,f(v,x));
     m
@@ -41,39 +41,18 @@ fn main() {
     let conllx_in = "tubadw-r1-ir-sample-1000";
     let index_out = "index.txt";
 
-    let file_in = match File::open(conllx_in) {
-        Ok(file) => file,
-        Err(err) => panic!("{}", err),
-    };
+    let file_in = File::open(conllx_in).unwrap();
 
-    let file_out = match File::create(index_out) {
-        Ok(file) => file,
-        Err(err) => panic!("{}", err),
-    };
-    
-    let sorted_set_add = |s,i| {
-        let mut s = match s {
-            Some(s) => s,
-            None => Vec::new(),
-        };
-        s.add(i);
-        s
-    };
-    
+    let file_out = File::create(index_out).unwrap();
+
+    let ref grow_posting = |s:Option<Vec<usize>>, i:usize| match s {
+        Some(s) => s.grow(i), None => Vec::new() };
+        
     let lem2idx = Reader::new(BufReader::new(file_in)).into_iter()
-        .flat_map(|sent| match sent {
-            Ok(sent) => sent,
-            Err(err) => panic!("{}", err),
-        })
-        .map(|tok| match (tok.lemma(), tok.features()) {
-            (Some(lem), Some(feat)) =>
-                (String::from(lem), match feat.as_str().parse::<usize>() {
-                    Ok(idx) => idx,
-                    Err(err) => panic!("{}", err),
-                }),
-            _ => panic!("ill-formed entry!"),
-        })
-        .fold(HashMap::new(), |m,(k,x)| update(m,k,&sorted_set_add,x));
+        .flat_map(|sent| sent.unwrap())
+        .map(|tok| (String::from(tok.lemma().unwrap()),
+                    tok.features().unwrap().as_str().parse::<usize>().unwrap()))
+        .fold(HashMap::new(), |m,(k,x)| update(m, k, grow_posting, x));
 
     let mut wtr = BufWriter::new(file_out);
     
