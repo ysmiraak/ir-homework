@@ -1,11 +1,12 @@
 use std::cmp::min;
+use std::borrow::Cow;
 use std::fs::File;
 use std::io::{BufReader,BufRead,stdin};
 use std::collections::HashMap;
 use std::hash::Hash;
 
 trait Posting<T:Posting<T>> {
-    fn intersect(&self, other: &T) -> T;
+    fn intersect(&self, other: &T) -> Self;
 }
 
 impl<T> Posting<Vec<T>> for Vec<T> where T:Ord+Copy {
@@ -32,35 +33,43 @@ impl<T> Posting<Vec<T>> for Vec<T> where T:Ord+Copy {
     }
 }
 
-fn parse_into_map<K,V>(file:File, f:&Fn(String) -> (K,V)) -> HashMap<K,V>
-    where K:Hash+Eq {
-    BufReader::new(file).lines()
+fn parse_into_map<K,V,R>(rdr:R, f:&Fn(&String) -> (K,V)) -> HashMap<K,V>
+    where K:Hash+Eq, R:BufRead {
+    rdr.lines()
         .filter_map(|line_res| match line_res {
-            Ok(line) => Option::Some(f(line)),
+            Ok(line) => Option::Some(f(&line)),
             Err(_) => Option::None })
         .fold(HashMap::new(), |mut m,(k,v)| { m.insert(k,v); m })
 }
 
+fn parse_posting(line:&String) -> (String, Vec<usize>) {
+    let x = line.find('\t').unwrap();
+    let term = line[..x].to_string();
+    let list = line[x+1..].split_whitespace()
+        .map(|idx_str| idx_str.parse::<usize>())
+        .filter_map(|idx_res| match idx_res {
+            Ok(idx) => Option::Some(idx),
+            Err(_) => Option::None })
+        .collect();
+    (term, list)
+}
+
+fn parse_idx2doc(line:&String) -> (usize, String) {
+    let x = line.find('\t').unwrap();
+    let idx = line[..x].parse::<usize>().unwrap();
+    let doc = line[x+1..].to_string();
+    (idx, doc)
+}
+
 fn main() {
-    let index_file_name = "index.txt";
-    let table_file_name = "tubadw-r1-ir-ids-1000.tab";
+    let posting_file_name = "index.txt";
+    let idx2doc_file_name = "tubadw-r1-ir-ids-1000.tab";
 
-    let index_in = File::open(index_file_name).unwrap();
-    let table_in = File::open(table_file_name).unwrap();
-
-    let lem2idx = parse_into_map(index_in, &|line| {
-        let x = line.find('\t').unwrap();
-        (line[..x].to_string(),
-         line[x+1..].split_whitespace()
-         .map(|idx_str| idx_str.parse::<usize>())
-         .filter_map(|idx_res| match idx_res {
-             Ok(idx) => Option::Some(idx),
-             Err(_) => Option::None })
-         .collect::<Vec<usize>>())});
-
-    let idx2doc = parse_into_map(table_in, &|line| {
-        let x = line.find('\t').unwrap();
-        (line[..x].parse::<usize>().unwrap(), line[x+1..].to_string())});
+    let posting_in = File::open(posting_file_name).unwrap();
+    let idx2doc_in = File::open(idx2doc_file_name).unwrap();
+    // try to open both files before parsing either
+    let lem2idx = parse_into_map(BufReader::new(posting_in), &parse_posting);
+    let idx2doc = parse_into_map(BufReader::new(idx2doc_in), &parse_idx2doc);
 
     let stdin = stdin();
     println!("enter query:");
@@ -74,8 +83,12 @@ fn main() {
             }
         }
         if terms.len() < 1 { continue }
+        // sort and do AND query
         terms.sort_by(|a,b| a.len().cmp(&b.len()));
-        for idx in terms[1..].iter().fold(terms[0].clone(), |a,b| a.intersect(b)) {
+        let posting = terms[1..].iter()
+            .fold(Cow::Borrowed(terms[0]), |a,b| Cow::Owned((&a).intersect(b)))
+            .into_owned();
+        for idx in posting {
             println!("{}: {}", idx, idx2doc.get(&idx).unwrap());
         }
         println!("\n\nenter query:");
