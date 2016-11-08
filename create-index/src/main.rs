@@ -38,23 +38,22 @@ fn main() {
     //     _ => println!("usage: create-index CONLLX_PATH INDEX_PATH"),
     // }
 
-    let conllx_in = "tubadw-r1-ir-sample-1000";
-    let index_out = "index.txt";
+    let conllx_in_file_name = "tubadw-r1-ir-sample-1000";
+    let index_out_file_name = "index.txt";
 
-    let file_in = File::open(conllx_in).unwrap();
-
-    let file_out = File::create(index_out).unwrap();
+    let conllx_in = File::open(conllx_in_file_name).unwrap();
+    let index_out = File::create(index_out_file_name).unwrap();
 
     let ref grow_posting = |s:Option<Vec<usize>>, i:usize| match s {
         Some(s) => s.grow(i), None => Vec::new() };
         
-    let lem2idx = Reader::new(BufReader::new(file_in)).into_iter()
+    let lem2idx = Reader::new(BufReader::new(conllx_in)).into_iter()
         .flat_map(|sent| sent.unwrap())
         .map(|tok| (String::from(tok.lemma().unwrap()),
                     tok.features().unwrap().as_str().parse::<usize>().unwrap()))
         .fold(HashMap::new(), |m,(k,x)| update(m, k, grow_posting, x));
 
-    let mut wtr = BufWriter::new(file_out);
+    let mut wtr = BufWriter::new(index_out);
     
     for (key, val) in lem2idx {
         write!(wtr, "{}\t", key).unwrap();
