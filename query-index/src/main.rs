@@ -63,7 +63,7 @@ fn parse_idx2doc(line:&String) -> (usize, String) {
 
 fn main() {
     let posting_file_name = "index.txt";
-    let idx2doc_file_name = "tubadw-r1-ir-ids-1000.tab";
+    let idx2doc_file_name = "tubadw-r1-ir-ids-100000.tab";
 
     let posting_in = File::open(posting_file_name).unwrap();
     let idx2doc_in = File::open(idx2doc_file_name).unwrap();
@@ -75,16 +75,18 @@ fn main() {
 
     let stdin = stdin();
     println!("enter query:");
-    for line in stdin.lock().lines() {        
+    for line in stdin.lock().lines() {
         let mut terms = Vec::new();
         for term in line.unwrap().split_whitespace() {
             if term.is_empty() { continue }
             match posting.get(term) {
                 Some(posting_list) => terms.push(posting_list),
-                None => { println!("no match found.\n\nenter query:"); break }
+                None => { println!("no match found.\n\nenter query:");
+                          terms.clear();
+                          break }
             }
         }
-        if terms.len() < 1 { continue }
+        if terms.is_empty() { continue }
         // sort and do AND query
         terms.sort_by(|a,b| a.len().cmp(&b.len()));
         let posting_list = terms[1..].iter()

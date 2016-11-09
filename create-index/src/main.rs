@@ -44,22 +44,15 @@ fn main() {
     let conllx_in = File::open(conllx_in_file_name).unwrap();
     let index_out = File::create(index_out_file_name).unwrap();
 
-    let ref grow_posting = |mv:Option<Vec<usize>>, i:usize| match mv {
-        Some(v) => v.inc(i), None => Vec::new().inc(i) };
-
     let lem2idx = Reader::new(BufReader::new(conllx_in)).into_iter()
         .flat_map(|sent| sent.unwrap())
-        .filter_map(|tok| {
-            match (tok.lemma(), tok.features()) {
-                (Some(lem), Some(feat)) =>
-                    match feat.as_str().parse::<usize>() {
-                        Ok(idx) => Option::Some((String::from(lem),idx)),
-                        Err(_) => { println!("{:?}",tok); Option::None }
-                    },
-                _ => { println!("{:?}",tok); Option::None}
-            }
-        })
-        .fold(HashMap::new(), |m,(k,i)| update(m, k, &|mv| grow_posting(mv,i)));
+        .filter_map(|tok| match (tok.lemma(), tok.features()) {
+            (Some(lem), Some(feat)) => match feat.as_str().parse::<u32>() {
+                Ok(idx) => Option::Some((String::from(lem),idx)),
+                Err(_) => Option::None },
+            _ => Option::None })
+        .fold(HashMap::new(), |m,(k,i)| update(m, k, &|mv:Option<Vec<u32>>| match mv {
+            Some(v) => v.inc(i), None => Vec::new().inc(i) }));
     
     let mut wtr = BufWriter::new(index_out);
 
