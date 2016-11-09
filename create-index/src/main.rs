@@ -34,7 +34,7 @@ fn main() {
 
     // match (args.nth(1), args.nth(2)) {
     //     (Some(conllx_in), Some(index_out)) => println!("yes"),
-    
+
     //     _ => println!("usage: create-index CONLLX_PATH INDEX_PATH"),
     // }
 
@@ -46,7 +46,7 @@ fn main() {
 
     let ref grow_posting = |s:Option<Vec<usize>>, i:usize| match s {
         Some(s) => s.grow(i), None => Vec::new() };
-        
+
     let lem2idx = Reader::new(BufReader::new(conllx_in)).into_iter()
         .flat_map(|sent| sent.unwrap())
         .map(|tok| (String::from(tok.lemma().unwrap()),
@@ -54,7 +54,7 @@ fn main() {
         .fold(HashMap::new(), |m,(k,x)| update(m, k, grow_posting, x));
 
     let mut wtr = BufWriter::new(index_out);
-    
+
     for (key, val) in lem2idx {
         write!(wtr, "{}\t", key).unwrap();
         for idx in val {

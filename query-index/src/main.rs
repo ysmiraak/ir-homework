@@ -68,8 +68,10 @@ fn main() {
     let posting_in = File::open(posting_file_name).unwrap();
     let idx2doc_in = File::open(idx2doc_file_name).unwrap();
     // try to open both files before parsing either
-    let lem2idx = parse_into_map(BufReader::new(posting_in), &parse_posting);
-    let idx2doc = parse_into_map(BufReader::new(idx2doc_in), &parse_idx2doc);
+    let posting:HashMap<String,Vec<usize>> =
+        parse_into_map(BufReader::new(posting_in), &parse_posting);
+    let idx2doc:HashMap<usize,String> =
+        parse_into_map(BufReader::new(idx2doc_in), &parse_idx2doc);
 
     let stdin = stdin();
     println!("enter query:");
@@ -77,18 +79,18 @@ fn main() {
         let mut terms = Vec::new();
         for term in line.unwrap().split_whitespace() {
             if term.is_empty() { continue }
-            match lem2idx.get(term) {
-                Some(posting) => terms.push(posting),
+            match posting.get(term) {
+                Some(posting_list) => terms.push(posting_list),
                 None => { println!("no match found.\n\nenter query:"); break }
             }
         }
         if terms.len() < 1 { continue }
         // sort and do AND query
         terms.sort_by(|a,b| a.len().cmp(&b.len()));
-        let posting = terms[1..].iter()
+        let posting_list = terms[1..].iter()
             .fold(Cow::Borrowed(terms[0]), |a,b| Cow::Owned((&a).intersect(b)))
             .into_owned();
-        for idx in posting {
+        for idx in posting_list {
             println!("{}: {}", idx, idx2doc.get(&idx).unwrap());
         }
         println!("\n\nenter query:");

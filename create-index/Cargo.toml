@@ -7,4 +7,4 @@ authors = ["Ysmiraak <ysmiraak@gmail.com>"]
 conllx = "0.3.1"
 
 [dev-dependencies]
-quickcheck = "0.3"
+quickcheck = "0.4.0"
