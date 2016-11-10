@@ -1,32 +1,25 @@
+extern crate protocoll;
 extern crate conllx;
 
+use protocoll::Map;
 // use std::env::args_os;
 use std::fs::File;
 use std::io::{BufReader,BufWriter};
 use std::io::Write;
 use conllx::Reader;
 use std::collections::HashMap;
-use std::hash::Hash;
 
-trait SortedSet<T:Ord+Copy> {
-    fn inc(self, item:T) -> Self;
+pub trait SortedSet<T> where T:Ord+Copy {
+    fn inc(self, i:T) -> Self;
 }
 
 impl<T> SortedSet<T> for Vec<T> where T:Ord+Copy {
-    fn inc(mut self, item:T) -> Self {
-        match self.binary_search(&item) {
-            Ok(_) => (),
-            Err(idx) => self.insert(idx, item)
-        };
+    fn inc(mut self, i:T) -> Self {
+        if let Err(idx) = self.binary_search(&i) {
+            self.insert(idx,i);
+        }
         self
     }
-}
-
-fn update<K,V>(mut m:HashMap<K,V>, k:K, f:&Fn(Option<V>) -> V) -> HashMap<K,V>
-    where K:Hash+Eq {
-    let v = m.remove(&k);
-    m.insert(k,f(v));
-    m
 }
 
 fn main() {
@@ -38,7 +31,7 @@ fn main() {
     //     _ => println!("usage: create-index CONLLX_PATH INDEX_PATH"),
     // }
 
-    let conllx_in_file_name = "tubadw-r1-ir-sample-100000";
+    let conllx_in_file_name = "tubadw-r1-ir-sample-1000";
     let index_out_file_name = "index.txt";
 
     let conllx_in = File::open(conllx_in_file_name).unwrap();
@@ -47,13 +40,16 @@ fn main() {
     let lem2idx = Reader::new(BufReader::new(conllx_in)).into_iter()
         .flat_map(|sent| sent.unwrap())
         .filter_map(|tok| match (tok.lemma(), tok.features()) {
-            (Some(lem), Some(feat)) => match feat.as_str().parse::<u32>() {
-                Ok(idx) => Option::Some((String::from(lem),idx)),
-                Err(_) => Option::None },
-            _ => Option::None })
-        .fold(HashMap::new(), |m,(k,i)| update(m, k, &|mv:Option<Vec<u32>>| match mv {
-            Some(v) => v.inc(i), None => Vec::new().inc(i) }));
-    
+            (Some(lem), Some(feat)) =>
+                match feat.as_str().parse::<u32>() {
+                    Ok(idx) => Option::Some((String::from(lem),idx)),
+                    Err(_) => { println!("illformed: {}",tok); Option::None }},
+            _ => { println!("skipping: {}",tok); Option::None }}
+        )
+        .fold(HashMap::new(), |m,(k,i)| Map::update
+              (m, k, |mv:Option<Vec<u32>>| SortedSet::inc
+               (if let Some(v) = mv { v } else { Vec::new() }, i)));
+
     let mut wtr = BufWriter::new(index_out);
 
     for (key, val) in lem2idx {
