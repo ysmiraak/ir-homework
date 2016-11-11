@@ -17,10 +17,10 @@ fn main() {
 
     let stdin = stdin();
     println!("enter query:");
-    for line_res in stdin.lock().lines() {
-        if let Err(_) = line_res { continue }
+    for res_line in stdin.lock().lines() {
+        if let Err(_) = res_line { continue }
         let mut terms = Vec::new();
-        for term in line_res.unwrap().split_whitespace() {
+        for term in res_line.unwrap().split_whitespace() {
             if term.is_empty() { continue }
             match posting.get(term) {
                 Some(p) => terms.push(p),

@@ -4,5 +4,4 @@ version = "0.1.0"
 authors = ["Kuan Yu <kuan.yu@student.uni-tuebingen.de>","Erik Schill <erik.schill@student.uni-tuebingen.de>"]
 
 [dependencies]
-protocoll = "0.1.0"
 conllx = "0.3.1"
