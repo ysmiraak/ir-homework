@@ -1,4 +1,5 @@
 extern crate conllx;
+extern crate protocoll;
 
 // use std::env::args_os;
 use std::fs::File;
@@ -6,6 +7,7 @@ use conllx::{Reader,Sentence};
 use std::io::{BufReader,BufWriter};
 use std::io::Write;
 use std::collections::HashMap;
+use protocoll::{Map,Str};
 
 fn main() {
     // let mut args = args_os();
@@ -33,33 +35,31 @@ fn main() {
         .filter_map(|(lem,feats)| match feats.as_str().parse::<u32>() {
             Ok(idx) => Option::Some((lem,idx)),
             Err(_) => { println!("illformed: {}",feats); Option::None }})
-        .fold(HashMap::new(), |mut m,(k,i)| {
-            let mut v = m.remove(&k).unwrap_or(Vec::new());
-            SortedSet::insert(&mut v,i);
-            m.insert(k,v);
-            m
-        });
+        .fold(HashMap::new(), |m,(k,i)| Map::update
+              (m, k, |opt_v| SortedSet::inc
+               (opt_v.unwrap_or(Vec::new()), i)));
     
     let mut wtr = BufWriter::new(index_out);
-    for (lem,idxs) in lem2idxs {
-        let mut out = lem;
-        out.push(' ');
-        out.push_str(&idxs.iter().map(|x| x.to_string()).collect::<Vec<String>>().join(" "));
-
-        if let Err(err) = writeln!(wtr, "{}", out) {
+    for (lem,idxs) in &lem2idxs {
+        let line = idxs.iter()
+            .map(u32::to_string)
+            .fold(lem.clone().inc('\t'), |line,s| line.plus(&s).inc(' '))
+            .dec().inc('\n');
+        if let Err(err) = wtr.write(line.as_bytes()) {
             println!("error: {}",err);
         }
     }
 }
 
 pub trait SortedSet<T> where T:Ord {
-    fn insert(&mut self, i:T);
+    fn inc(self, i:T) -> Self;
 }
 
 impl<T> SortedSet<T> for Vec<T> where T:Ord {
-    fn insert(&mut self, i:T) {
+    fn inc(mut self, i:T) -> Self {
         if let Err(idx) = self.binary_search(&i) {
-            Vec::insert(self,idx,i);
+            Vec::insert(&mut self,idx,i);
         }
+        self
     }
 }
