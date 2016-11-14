@@ -3,9 +3,8 @@ extern crate protocoll;
 
 // use std::env::args_os;
 use std::fs::File;
+use std::io::{BufReader,BufWriter,Write};
 use conllx::{Reader,Sentence};
-use std::io::{BufReader,BufWriter};
-use std::io::Write;
 use std::collections::HashMap;
 use protocoll::{Map,Str};
 
@@ -37,7 +36,7 @@ fn main() {
             Err(_) => { println!("illformed: {}",feats); Option::None }})
         .fold(HashMap::new(), |m,(k,i)| Map::update
               (m, k, |opt_v| SortedSet::inc
-               (opt_v.unwrap_or(Vec::new()), i)));
+               (opt_v.unwrap_or_default(), i)));
     
     let mut wtr = BufWriter::new(index_out);
     for (lem,idxs) in &lem2idxs {
