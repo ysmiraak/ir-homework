@@ -1,10 +1,11 @@
-//! Authors: Kuan Yu, 3913893; Erik Schill, 3932609.
-//! Honor Code:  We pledge that this program represents our own work.
+//! Author: Kuan Yu, 3913893
+//! Honor Code: I pledge that this program represents my own work.
 
 extern crate conllx;
 extern crate protocoll;
 
-// use std::env::args_os;
+use std::env::args;
+use std::process::exit;
 use std::fs::File;
 use std::io::{BufReader,BufWriter,Write};
 use conllx::{Reader,Sentence};
@@ -12,19 +13,22 @@ use std::collections::HashMap;
 use protocoll::{Map,Str};
 
 fn main() {
-    // let mut args = args_os();
+    // let args:Vec<&str> = vec!["create-index","tubadw-r1-ir-sample-100000","index.txt"];
 
-    // match (args.nth(1), args.nth(2)) {
-    //     (Some(conllx_in), Some(index_out)) => println!("yes"),
-
-    //     _ => println!("usage: create-index CONLLX_PATH INDEX_PATH"),
-    // }
-
-    let conllx_in_path = "tubadw-r1-ir-sample-100000";
-    let index_out_path = "index.txt";
-
-    let conllx_in = File::open(conllx_in_path).unwrap();
-    let index_out = File::create(index_out_path).unwrap();
+    let args:Vec<String> = args().collect();
+    if 3 != args.len() {
+        println!("usage: {} INPUT_CONLLX_FILE OUTPUT_INDEX_FILE", args[0]); exit(1)
+    }
+    
+    let conllx_in = match File::open(&args[1]) {
+        Err(_) => { println!("cannot open file for reading: {}", args[1]); exit(2)}
+        Ok(file) => file
+    };
+    
+    let index_out = match File::create(&args[2]) {
+        Err(_) => { println!("cannot open file for reading: {}", args[2]); exit(3)}
+        Ok(file) => file
+    };
 
     let lem2idxs:HashMap<String,Vec<u32>> =
         Reader::new(BufReader::new(conllx_in)).into_iter()

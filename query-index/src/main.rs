@@ -1,6 +1,8 @@
-//! Authors: Kuan Yu, 3913893; Erik Schill, 3932609.
-//! Honor Code: We pledge that this program represents our own work.
+//! Author: Kuan Yu, 3913893
+//! Honor Code: I pledge that this program represents my own work.
 
+use std::env::args;
+use std::process::exit;
 use std::fs::File;
 use std::io::{BufReader,BufRead,stdin};
 use std::collections::HashMap;
@@ -8,16 +10,28 @@ use std::hash::Hash;
 use std::borrow::Cow;
 
 fn main() {
-    let posting_path = "index.txt";
-    let idx2doc_path = "tubadw-r1-ir-ids-100000.tab";
-
-    let posting_in = File::open(posting_path).unwrap();
-    let idx2doc_in = File::open(idx2doc_path).unwrap();
+    // let args:Vec<&str> = vec!["query-index","index.txt","tubadw-r1-ir-ids-100000.tab"];
     
-    // try to open both files before parsing either
-    let posting = parse_to_map(BufReader::new(posting_in), parse_posting);
-    let idx2doc = parse_to_map(BufReader::new(idx2doc_in), parse_idx2doc);
+    let args:Vec<String> = args().collect();
 
+    let print_title = match args.len() {
+        2 => false,
+        3 => true,
+        _ => { println!("usage: {} TERM_INDEX_FILE (INDEX_TITLE_FILE)", args[0]); exit(1)}
+    };
+
+    let posting = match File::open(&args[1]) {
+        Err(_) => { println!("cannot open file for reading: {}", args[1]); exit(2)}
+        Ok(file) => parse_to_map(BufReader::new(file), parse_posting)
+    };
+
+    let idx2doc = if !print_title { HashMap::new() } else {
+        match File::open(&args[2]) {
+            Err(_) => { println!("cannot open file for reading: {}", args[2]); exit(3)},
+            Ok(file) => parse_to_map(BufReader::new(file), parse_idx2doc)
+        }
+    };
+    
     let stdin = stdin();
     println!("enter query:");
     'doquery: for res_line in stdin.lock().lines() {
@@ -40,7 +54,10 @@ fn main() {
             .fold(Cow::Borrowed(terms[0]), |a,b| Cow::Owned((&a).intersection(b)))
             .into_owned();
         for idx in posting_list {
-            println!("{}: {}", idx, idx2doc.get(&idx).unwrap_or(&String::new()));
+            match print_title {
+                true => println!("{}: {}", idx, idx2doc.get(&idx).unwrap_or(&String::new())),
+                false => println!("{}",idx)
+            }
         }
         println!("\n\nenter query:");
     }
