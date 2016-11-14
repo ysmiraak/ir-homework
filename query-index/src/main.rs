@@ -1,3 +1,6 @@
+//! Authors: Kuan Yu, 3913893; Erik Schill, 3932609.
+//! Honor Code: We pledge that this program represents our own work.
+
 use std::fs::File;
 use std::io::{BufReader,BufRead,stdin};
 use std::collections::HashMap;

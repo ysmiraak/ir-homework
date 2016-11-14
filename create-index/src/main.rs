@@ -1,3 +1,6 @@
+//! Authors: Kuan Yu, 3913893; Erik Schill, 3932609.
+//! Honor Code:  We pledge that this program represents our own work.
+
 extern crate conllx;
 extern crate protocoll;
 
