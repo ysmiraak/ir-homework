@@ -20,15 +20,15 @@ fn main() {
         _ => { println!("usage: {} TERM_INDEX_FILE (INDEX_TITLE_FILE)", args[0]); exit(1)}
     };
 
-    let posting = match File::open(&args[1]) {
+    let term2idxs:HashMap<String,Vec<u32>> = match File::open(&args[1]) {
         Err(_) => { println!("cannot open file for reading: {}", args[1]); exit(2)}
-        Ok(file) => parse_to_map(BufReader::new(file), parse_posting)
+        Ok(file) => parse_to_map(BufReader::new(file), parse_term2idxs)
     };
 
-    let idx2doc = if !print_title { HashMap::new() } else {
+    let idx2title:HashMap<u32,String> = if !print_title { HashMap::new() } else {
         match File::open(&args[2]) {
             Err(_) => { println!("cannot open file for reading: {}", args[2]); exit(3)},
-            Ok(file) => parse_to_map(BufReader::new(file), parse_idx2doc)
+            Ok(file) => parse_to_map(BufReader::new(file), parse_idx2title)
         }
     };
     
@@ -42,7 +42,7 @@ fn main() {
         let mut terms = Vec::new();
         for term in line.split_whitespace() {
             if term.is_empty() { continue }
-            match posting.get(term) {
+            match term2idxs.get(term) {
                 Some(p) => terms.push(p),
                 None => { println!("no match found.\n\nenter query:"); continue 'doquery }
             }
@@ -50,12 +50,12 @@ fn main() {
         if terms.is_empty() { continue 'doquery }
         // sort and do AND query
         terms.sort_by(|a,b| a.len().cmp(&b.len()));
-        let posting_list = terms[1..].iter()
+        let idxs = terms[1..].iter()
             .fold(Cow::Borrowed(terms[0]), |a,b| Cow::Owned((&a).intersection(b)))
             .into_owned();
-        for idx in posting_list {
+        for idx in idxs {
             match print_title {
-                true => println!("{}: {}", idx, idx2doc.get(&idx).unwrap_or(&String::new())),
+                true => println!("{}: {}", idx, idx2title.get(&idx).unwrap_or(&String::new())),
                 false => println!("{}",idx)
             }
         }
@@ -74,29 +74,29 @@ fn parse_to_map<F,K,V,R>(rdr:R, f:F) -> HashMap<K,V>
         .collect()
 }
 
-fn parse_posting(line:String) -> Option<(String, Vec<u32>)> {
+fn parse_term2idxs(line:String) -> Option<(String, Vec<u32>)> {
     let x = match line.find('\t') {
         None => { println!("illformed: {}",line); return Option::None },
         Some(x) => x };
     let term = line[..x].to_string();
-    let list = line[x+1..].split_whitespace()
+    let idxs = line[x+1..].split_whitespace()
         .map(|idx_str| idx_str.parse::<u32>())
         .filter_map(|res_idx| match res_idx {
             Err(_) => { println!("illformed: {}",line); Option::None },
             Ok(idx) => Option::Some(idx)})
         .collect();
-    Option::Some((term,list))
+    Option::Some((term,idxs))
 }
 
-fn parse_idx2doc(line:String) -> Option<(u32, String)> {
+fn parse_idx2title(line:String) -> Option<(u32, String)> {
     let x = match line.find('\t') {
         None => { println!("illformed: {}",line); return Option::None },
         Some(x) => x };
     let idx = match line[..x].parse::<u32>() {
         Err(_) => { println!("illformed: {}",line); return Option::None },
         Ok(idx) => idx };
-    let doc = line[x+1..].to_string();
-    Option::Some((idx,doc))
+    let title = line[x+1..].to_string();
+    Option::Some((idx,title))
 }
 
 pub trait SortedSet<T> {

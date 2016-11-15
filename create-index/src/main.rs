@@ -30,7 +30,7 @@ fn main() {
         Ok(file) => file
     };
 
-    let lem2idxs:HashMap<String,Vec<u32>> =
+    let term2idxs:HashMap<String,Vec<u32>> =
         Reader::new(BufReader::new(conllx_in)).into_iter()
         .flat_map(|res_sent| match res_sent {
             Ok(sent) => sent,
@@ -46,10 +46,10 @@ fn main() {
                (opt_v.unwrap_or_default(), i)));
     
     let mut wtr = BufWriter::new(index_out);
-    for (lem,idxs) in &lem2idxs {
+    for (term,idxs) in &term2idxs {
         let line = idxs.iter()
             .map(u32::to_string)
-            .fold(lem.clone().inc('\t'), |line,s| line.plus(&s).inc(' '))
+            .fold(term.clone().inc('\t'), |line,s| line.plus(&s).inc(' '))
             .dec().inc('\n');
         if let Err(err) = wtr.write(line.as_bytes()) {
             println!("error: {}",err);
