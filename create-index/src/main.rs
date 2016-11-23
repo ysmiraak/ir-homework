@@ -41,9 +41,9 @@ fn main() {
         .filter_map(|(lem,feats)| match feats.as_str().parse::<u32>() {
             Ok(idx) => Option::Some((lem,idx)),
             Err(_) => { println!("illformed: {}",feats); Option::None }})
-        .fold(HashMap::new(), |m,(k,i)| Map::update
-              (m, k, |opt_v| SortedSet::inc
-               (opt_v.unwrap_or_default(), i)));
+        .fold(HashMap::new(), |m,(k,i)| Map::update_in_place
+              (m, k, Vec::new(), |mut v| if let Err(idx) = v.binary_search(&i)
+               {Vec::insert(&mut v,idx,i);}));
     
     let mut wtr = BufWriter::new(index_out);
     for (term,idxs) in &term2idxs {
@@ -54,18 +54,5 @@ fn main() {
         if let Err(err) = wtr.write(line.as_bytes()) {
             println!("error: {}",err);
         }
-    }
-}
-
-pub trait SortedSet<T> where T:Ord {
-    fn inc(self, i:T) -> Self;
-}
-
-impl<T> SortedSet<T> for Vec<T> where T:Ord {
-    fn inc(mut self, i:T) -> Self {
-        if let Err(idx) = self.binary_search(&i) {
-            Vec::insert(&mut self,idx,i);
-        }
-        self
     }
 }
