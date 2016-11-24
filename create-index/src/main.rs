@@ -17,16 +17,16 @@ fn main() {
 
     let args:Vec<String> = args().collect();
     if 3 != args.len() {
-        println!("usage: {} INPUT_CONLLX_FILE OUTPUT_INDEX_FILE", args[0]); exit(1)
+        println!("usage: {} INPUT_CONLLX_FILE OUTPUT_INDEX_FILE",args[0]); exit(1)
     }
-    
+
     let conllx_in = match File::open(&args[1]) {
-        Err(_) => { println!("cannot open file for reading: {}", args[1]); exit(2)}
+        Err(_) => {println!("cannot open file for reading: {}",args[1]); exit(2)}
         Ok(file) => file
     };
-    
+
     let index_out = match File::create(&args[2]) {
-        Err(_) => { println!("cannot open file for reading: {}", args[2]); exit(3)}
+        Err(_) => {println!("cannot open file for reading: {}",args[2]); exit(3)}
         Ok(file) => file
     };
 
@@ -37,14 +37,14 @@ fn main() {
             Err(err) => { println!("error: {}",err); Sentence::new(Vec::new())}})
         .filter_map(|tok| match (tok.lemma(),tok.features()) {
             (Some(lem),Some(feats)) => Some((lem.to_string(),feats.to_string())),
-            _ => { println!("skipping: {}",tok); Option::None }})
+            _ => { println!("skipping: {}",tok); Option::None}})
         .filter_map(|(lem,feats)| match feats.as_str().parse::<u32>() {
             Ok(idx) => Option::Some((lem,idx)),
-            Err(_) => { println!("illformed: {}",feats); Option::None }})
+            Err(_) => { println!("illformed: {}",feats); Option::None}})
         .fold(HashMap::new(), |m,(k,i)| Map::update_in_place
-              (m, k, Vec::new(), |mut v| if let Err(idx) = v.binary_search(&i)
-               {Vec::insert(&mut v,idx,i);}));
-    
+              (m, k, Vec::new(), |v| if let Err(idx) = v.binary_search(&i)
+               {Vec::insert(v,idx,i);}));
+
     let mut wtr = BufWriter::new(index_out);
     for (term,idxs) in &term2idxs {
         let line = idxs.iter()
