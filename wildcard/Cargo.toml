@@ -4,4 +4,5 @@ version = "0.1.0"
 authors = ["Kuan Yu <kuan.yu@student.uni-tuebingen.de>"]
 
 [dependencies]
-protocoll = "0.2.1"
+protocoll = "0.2.2"
+rand = "0.3"
