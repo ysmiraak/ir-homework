@@ -1,22 +1,11 @@
-use protocoll::{Map,Str,Seq};
 use protocoll::map::VecSortedMap;
+use protocoll::{Map,Str,Seq};
+use trie::Trie;
 
-pub trait Trie {
-    fn learn<I>(self, s:I) -> Self where I:Iterator<Item = char>;
-    fn recognize<I>(&self, s:I) -> bool where I:Iterator<Item = char>;
-    fn prefix_search<I>(&self, s:I) -> Vec<String> where I:Iterator<Item = char>;
-}
-
-#[derive(Debug,Clone,PartialEq,Eq,PartialOrd,Ord,Hash)]
+#[derive(Default,Debug,Clone,PartialEq,Eq,PartialOrd,Ord,Hash)]
 pub struct ArrayMapTrie {
     pub arrmap:VecSortedMap<char,ArrayMapTrie>,
     pub accept:bool
-}
-
-impl Default for ArrayMapTrie {
-    fn default() -> Self {
-        ArrayMapTrie::new()
-    }
 }
 
 impl ArrayMapTrie {

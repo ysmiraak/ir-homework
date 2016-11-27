@@ -1,4 +1,6 @@
 use std::collections::HashMap;
+use protocoll::{Map,Str,Seq};
+use trie::Trie;
 
 #[derive(Debug,Clone,PartialEq,Eq)]
 pub enum HashMapTrie {
@@ -60,23 +62,26 @@ impl HashMapTrie {
 }
 
 impl Trie for HashMapTrie {
-    fn learn(self, s:&str) -> Self {
-        self._learn(s.chars())
+    fn learn<I>(self, s:I) -> Self where I:Iterator<Item = char> {
+        self._learn(s)
     }
 
-    fn recognize(&self, s:&str) -> bool {
-        self._recognize(s.chars())
+    fn recognize<I>(&self, s:I) -> bool where I:Iterator<Item = char> {
+        self._recognize(s)
     }
 
-    fn prefix_search(&self, prefix:&str) -> Vec<String> {
-        let mut s = prefix.chars();
+    fn prefix_search<I>(&self, mut s:I) -> Vec<String> where I:Iterator<Item = char> {
+        let mut p = String::new();
         let mut t = self;
         loop {
             match s.next() {
-                None => return t._prefix_search(String::from(prefix)),
-                Some(c) => match t.view_content().get(&c) {
-                    None => return Vec::new(),
-                    Some(tc) => t = tc
+                None => return t._prefix_search(p),
+                Some(c) => {
+                    p.push(c);
+                    match t.view_content().get(&c) {
+                        None => return Vec::new(),
+                        Some(tc) => t = tc
+                    }
                 }
             }
         }
