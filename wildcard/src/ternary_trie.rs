@@ -1,6 +1,5 @@
-use trie::Trie;
 use std::cmp::Ordering::{Less,Equal,Greater};
-use std::fmt;
+use trie::Trie;
 
 #[derive(Default,Debug,Clone,PartialEq,Eq,PartialOrd,Ord,Hash)]
 pub struct TernaryTrie(Option<Box<TernaryTrieNode>>);
@@ -75,12 +74,10 @@ impl TernaryTrie {
     fn search_add(&self, p:&str, mut acc:Vec<String>) -> Vec<String> {
         let n = match self.0 {
             None => return acc,
-            Some(ref n ) => n
+            Some(ref n) => n
         };
-
         acc = n.lo.search_add(p,acc);
         acc = n.hi.search_add(p,acc);
-
         let mut p = p.to_owned();
         p.push(n.c);
         acc = n.eq.search_add(&p,acc);
@@ -89,13 +86,14 @@ impl TernaryTrie {
     }
 }
 
-impl fmt::Display for TernaryTrie {
-    fn fmt(&self, f:&mut fmt::Formatter) -> fmt::Result {
+use std::fmt::{Display,Formatter,Result};
+impl Display for TernaryTrie {
+    fn fmt(&self, f:&mut Formatter) -> Result {
         match self.0 {
             None => write!(f, "_"),
             Some(ref n) => {
                 let (l,r) = if n.accept {('[',']')} else {('(',')')};
-                write!(f, "{}{} {} {} {}{}", l, n.c, n.lo, n.eq, n.hi, r)
+                write!(f,"{}{} {} {} {}{}",l,n.c,n.lo,n.eq,n.hi,r)
             }
         }
     }
@@ -125,22 +123,3 @@ impl Trie for TernaryTrie {
         ret
     }
 }
-
-// fn main() {
-//     let tt = TernaryTrie::new()
-//         .learn("viva".chars())
-//         .learn("vivec".chars())
-//         .learn("vehk".chars());
-
-//     // println!("{:?}",tt);
-//     // println!("{}",tt);
-
-//     // let (opt_t,acc) = tt.search('v');
-//     // println!(":acc {} :trie {}", acc, opt_t.unwrap());
-
-//     // println!("{:?}",tt.recognize("vivec".chars()));
-//     // println!("{:?}",tt.recognize("vehk".chars()));
-//     // println!("{:?}",tt.recognize("viehk".chars()));
-
-//     println!("{:?}",tt.prefix_search("vivec".chars()));
-// }
