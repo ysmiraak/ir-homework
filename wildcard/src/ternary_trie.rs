@@ -111,15 +111,61 @@ impl Trie for TernaryTrie {
         self.search(s).1
     }
 
-    fn prefix_search<I>(&self, s:I) -> Vec<String> where I:Iterator<Item = char> {
-        let ret = Vec::new();
+    fn prefix_search<'a,I>(&'a self, s:I) -> Box<Iterator<Item = String> + 'a>
+        where I:Iterator<Item = char> {
+            let ret = Vec::new();
         let p:String = s.collect();
         let (t,add_p) = match self.search(p.chars()) {
-            (None,_) => return ret,
+            (None,_) => return Box::new(ret.into_iter()),
             (Some(t),add_p) => (t,add_p)
         };
         let mut ret = t.search_add(&p,ret);
         if add_p {ret.push(p);}
-        ret
+        Box::new(ret.into_iter())
     }
 }
+
+// #[derive(Clone)]
+// pub struct Iter {
+//     stack:Vec<TernaryTrie>,
+//     prefix:String,
+//     cons_prefix:bool
+// }
+
+// impl<'a> Iterator for Iter<'a> {
+//     type Item = String;
+//     fn next(&mut self) -> Option<String> {
+//         if self.cons_prefix {
+//             self.cons_prefix = false;
+//             return Some(self.prefix.to_owned())
+//         }
+//         let mut end = match self.stack.pop() {
+//             None => return None,
+//             Some(i) => i
+//         };
+//         match end.next() {
+//             None => {
+//                 self.prefix.pop(); 
+//                 self.next()
+//             },
+//             Some(&(c, ref t)) => {
+//                 self.prefix.push(c);
+//                 self.stack.push(end);
+//                 self.stack.push(t.node.iter());
+//                 match t.accept {
+//                     true => Some(self.prefix.to_owned()),
+//                     false => self.next()
+//                 }
+//             }
+//         }
+//     }
+// }
+
+// impl<'a> IntoIterator for &'a ArrayMapTrie {
+//     type Item = String;
+//     type IntoIter = Iter<'a>;
+//     fn into_iter(self) -> Self::IntoIter {
+//         self.iter()
+//     }   
+
+// }

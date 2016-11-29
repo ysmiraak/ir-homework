@@ -3,11 +3,10 @@ extern crate protocoll;
 mod array_trie;
 mod btree_trie;
 mod hash_trie;
-// mod ternary_trie;
+mod ternary_trie;
 
 pub mod trie {
     pub trait Trie {
-        // fn insert<I>(&mut self, s:I) where I:Iterator<Item = char>;
         fn learn<I>(self, s:I) -> Self where I:Iterator<Item = char>;
         fn recognize<I>(&self, s:I) -> bool where I:Iterator<Item = char>;
         fn prefix_search<'a,I>(&'a self, s:I) -> Box<Iterator<Item = String> + 'a>
@@ -17,7 +16,7 @@ pub mod trie {
     pub use array_trie::ArrayMapTrie;
     pub use btree_trie::BTreeMapTrie;
     pub use hash_trie::HashMapTrie;
-    // pub use ternary_trie::TernaryTrie;
+    pub use ternary_trie::TernaryTrie;
 }
 
 pub mod query {

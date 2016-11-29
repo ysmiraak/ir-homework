@@ -12,18 +12,18 @@ use rand::{thread_rng,Rng};
 fn main() {
     let args:Vec<String> = args().collect();
     if 2 != args.len() {println!("usage: {} WORD_LIST_FILE",args[0]); exit(1)}
-    
-    let mut words:Vec<String> = match File::open(&args[1]) {
+    let file = match File::open(&args[1]) {
         Err(_) => {println!("cannot open file for reading: {}",args[1]); exit(2)}
-        Ok(file) => BufReader::new(file).lines().filter_map(Result::ok).collect()
-    };
+        Ok(file) => BufReader::new(file)};
+
+    let mut words:Vec<_> = file.lines().filter_map(Result::ok).collect();
     
     let mut rng = thread_rng();
     rng.shuffle(&mut words);
 
-    let (t,t_rev) = words.into_iter().fold
+    let (t,r) = words.into_iter().fold
         ((TernaryTrie::new(),TernaryTrie::new()),
-         |(t,t_rev),w| (t.learn(w.chars()),t_rev.learn(w.chars().rev())));
+         |(t,r),w| (t.learn(w.chars()),r.learn(w.chars().rev())));
     
     let stdin = stdin();
     println!("enter query:");
@@ -33,7 +33,7 @@ fn main() {
             Ok(line) => line.trim().to_owned()
         };
         if line.is_empty() {continue}
-        match wildcard_query(&t,&t_rev,&line) {
+        match wildcard_query(&t,&r,&line) {
             Err(err) => println!("{}",err),
             Ok(words) => for w in words {println!("{}",w)}
         }
