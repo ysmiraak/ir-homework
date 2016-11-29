@@ -1,6 +1,7 @@
 use protocoll::map::VecSortedMap;
-use protocoll::{Map,Str,Seq};
+use protocoll::{Map,MapMut};
 use trie::Trie;
+use std::slice;
 
 #[derive(Default,Debug,Clone,PartialEq,Eq,PartialOrd,Ord,Hash)]
 pub struct ArrayMapTrie {
@@ -16,19 +17,42 @@ impl ArrayMapTrie {
         }
     }
 
-    fn search_prefixed(&self, p:String) -> Vec<String> {
-        self.node.iter().fold
-            (if self.accept {Vec::new().inc(p.to_owned())} else {Vec::new()},
-             |ret,&(c,ref t)| ret.plus(t.search_prefixed(p.to_owned().inc(c))))
+    pub fn shrink_to_fit(&mut self) {
+        self.node.update_all_mut(|_,t| t.shrink_to_fit());
+        self.node.shrink_to_fit();
+    }
+
+    // fn insert<I>(&mut self, mut s:I) where I:Iterator<Item = char> {
+    //     match s.next() {
+    //         None => self.accept = true,
+    //         Some(c) => self.node.update_mut(c, ArrayMapTrie::new(), |t| t.insert(s))
+    //     }
+    // }
+
+    fn iter_prefixed(&self, prefix:String) -> Iter {
+        Iter {
+            stack:vec![self.node.iter()],
+            prefix:prefix,
+            cons_prefix:self.accept
+        }
+    }
+
+    pub fn iter(&self) -> Iter {
+        self.iter_prefixed(String::new())
     }
 }
 
 impl Trie for ArrayMapTrie {
+    // fn learn<I>(mut self, s:I) -> Self where I:Iterator<Item = char> {
+    //     self.insert(s);
+    //     self
+    // }
+
     fn learn<I>(mut self, mut s:I) -> Self where I:Iterator<Item = char> {
         match s.next() {
             None => {self.accept = true; self}
             Some(c) => ArrayMapTrie {
-                node:self.node.update(c, |opt_t| opt_t.unwrap_or_default().learn(s)).shrink(),
+                node:self.node.update(c, |opt_t| opt_t.unwrap_or_default().learn(s)),
                 accept:self.accept
             }
         }
@@ -44,15 +68,65 @@ impl Trie for ArrayMapTrie {
         }
     }
 
-    fn prefix_search<I>(&self, s:I) -> Vec<String> where I:Iterator<Item = char> {
-        let p:String = s.collect();
+    fn prefix_search<'a,I>(&'a self, s:I) -> Box<Iterator<Item = String> + 'a>
+        where I:Iterator<Item = char> {
+        let mut p = String::new();
         let mut t = self;
-        for c in p.chars() {
+        for c in s {
+            p.push(c);
             t = match t.node.get(&c) {
-                None => return Vec::new(),
-                Some(t) => t
+                Some(t) => t,
+                None => return Box::new(Iter {
+                    stack:Vec::new(),
+                    prefix:String::new(),
+                    cons_prefix:false
+                })
             }
         }
-        t.search_prefixed(p)
+        Box::new(t.iter_prefixed(p))
     }
+}
+
+#[derive(Clone)]
+pub struct Iter<'a> {
+    stack:Vec<slice::Iter<'a,(char,ArrayMapTrie)>>,
+    prefix:String,
+    cons_prefix:bool
+}
+
+impl<'a> Iterator for Iter<'a> {
+    type Item = String;
+    fn next(&mut self) -> Option<String> {
+        if self.cons_prefix {
+            self.cons_prefix = false;
+            return Some(self.prefix.to_owned())
+        }
+        let mut end = match self.stack.pop() {
+            None => return None,
+            Some(i) => i
+        };
+        match end.next() {
+            None => {
+                self.prefix.pop(); 
+                self.next()
+            },
+            Some(&(c, ref t)) => {
+                self.prefix.push(c);
+                self.stack.push(end);
+                self.stack.push(t.node.iter());
+                match t.accept {
+                    true => Some(self.prefix.to_owned()),
+                    false => self.next()
+                }
+            }
+        }
+    }
+}
+
+impl<'a> IntoIterator for &'a ArrayMapTrie {
+    type Item = String;
+    type IntoIter = Iter<'a>;
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
+    }   
 }

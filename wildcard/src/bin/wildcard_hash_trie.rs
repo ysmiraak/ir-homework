@@ -10,13 +10,16 @@ use std::io::{BufReader,BufRead,stdin};
 fn main() {
     let args:Vec<String> = args().collect();
     if 2 != args.len() {println!("usage: {} WORD_LIST_FILE",args[0]); exit(1)}
-
-    let (t,t_rev) = match File::open(&args[1]) {
+    let file = match File::open(&args[1]) {
         Err(_) => {println!("cannot open file for reading: {}",args[1]); exit(2)}
-        Ok(file) => BufReader::new(file).lines().filter_map(Result::ok)
-            .fold((HashMapTrie::new(),HashMapTrie::new()),
-                  |(t,t_rev),w| (t.learn(w.chars()),t_rev.learn(w.chars().rev())))
-    };
+        Ok(file) => BufReader::new(file)};
+
+    let (mut t, mut r) = file.lines().filter_map(Result::ok)
+        .fold((HashMapTrie::new(),HashMapTrie::new()),
+              |(t,r),w| (t.learn(w.chars()),r.learn(w.chars().rev())));
+
+    t.shrink_to_fit();
+    r.shrink_to_fit();
     
     let stdin = stdin();
     println!("enter query:");
@@ -26,7 +29,7 @@ fn main() {
             Ok(line) => line.trim().to_owned()
         };
         if line.is_empty() {continue}
-        match wildcard_query(&t,&t_rev,&line) {
+        match wildcard_query(&t,&r,&line) {
             Err(err) => println!("{}",err),
             Ok(words) => for w in words {println!("{}",w)}
         }
