@@ -87,7 +87,7 @@ impl<'a> Iterator for Iter<'a> {
         match end.next() {
             None => {
                 self.prefix.pop();
-self.next()
+                self.next()
             },
             Some((&c,t)) => {
                 self.prefix.push(c);
