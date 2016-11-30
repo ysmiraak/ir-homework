@@ -6,3 +6,4 @@ authors = ["Kuan Yu <kuan.yu@student.uni-tuebingen.de>"]
 [dependencies]
 protocoll = "0.3.0"
 rand = "0.3"
+heapsize = "0.3.7"

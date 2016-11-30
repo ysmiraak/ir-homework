@@ -81,8 +81,8 @@ impl<'a> Iterator for Iter<'a> {
         };
         match end.next() {
             None => {
-                self.prefix.pop(); 
-                self.next()
+                self.prefix.pop();
+self.next()
             },
             Some((&c,t)) => {
                 self.prefix.push(c);
@@ -91,5 +91,12 @@ impl<'a> Iterator for Iter<'a> {
                 if t.accept {Some(self.prefix.to_owned())} else {self.next()}
             }
         }
+    }
+}
+
+use heapsize::HeapSizeOf;
+impl HeapSizeOf for BTreeMapTrie {
+    fn heap_size_of_children(&self) -> usize {
+        self.node.heap_size_of_children()
     }
 }

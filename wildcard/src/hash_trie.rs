@@ -17,8 +17,8 @@ impl HashMapTrie {
     }
 
     pub fn shrink_to_fit(&mut self) {
-        self.node.update_all_mut(|_,t| t.shrink_to_fit());
         self.node.shrink_to_fit();
+        self.node.update_all_mut(|_,t| t.shrink_to_fit());
     }
 
     fn insert<I>(&mut self, mut s:I) where I:Iterator<Item = char> {
@@ -34,7 +34,7 @@ impl Trie for HashMapTrie {
         self.insert(s);
         self
     }
-    
+
     // fn learn<I>(mut self, mut s:I) -> Self where I:Iterator<Item = char> {
     //     match s.next() {
     //         None => {self.accept = true; self}
@@ -86,8 +86,8 @@ impl<'a> Iterator for Iter<'a> {
         };
         match end.next() {
             None => {
-                self.prefix.pop(); 
-                self.next()
+                self.prefix.pop();
+self.next()
             },
             Some((&c,t)) => {
                 self.prefix.push(c);
@@ -96,5 +96,12 @@ impl<'a> Iterator for Iter<'a> {
                 if t.accept {Some(self.prefix.to_owned())} else {self.next()}
             }
         }
+    }
+}
+
+use heapsize::HeapSizeOf;
+impl HeapSizeOf for HashMapTrie {
+    fn heap_size_of_children(&self) -> usize {
+        self.node.heap_size_of_children()
     }
 }

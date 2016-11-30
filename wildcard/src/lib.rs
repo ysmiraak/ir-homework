@@ -1,4 +1,5 @@
 extern crate protocoll;
+extern crate heapsize;
 
 mod array_trie;
 mod btree_trie;

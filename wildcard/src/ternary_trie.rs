@@ -98,7 +98,7 @@ impl Trie for TernaryTrie {
     }
 
     fn prefix_search<'a,I>(&'a self, s:I) -> Box<Iterator<Item = String> + 'a>
-        where I:Iterator<Item = char> {        
+        where I:Iterator<Item = char> {
         let p:String = s.collect();
         let (n,add_p) = match self.search(p.chars()) {
             (None,_) => return Box::new(Vec::new().into_iter()),
@@ -144,5 +144,20 @@ impl<'a> Iterator for Iter<'a> {
             Some(s) => Some(s),
             None => self.next()
         }
+    }
+}
+
+use heapsize::HeapSizeOf;
+impl HeapSizeOf for TernaryTrieNode {
+    fn heap_size_of_children(&self) -> usize {
+        self.lo.heap_size_of_children()
+            + self.eq.heap_size_of_children()
+            + self.hi.heap_size_of_children()
+    }
+}
+
+impl HeapSizeOf for TernaryTrie {
+    fn heap_size_of_children(&self) -> usize {
+        self.0.heap_size_of_children()
     }
 }

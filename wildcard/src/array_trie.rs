@@ -18,8 +18,8 @@ impl ArrayMapTrie {
     }
 
     pub fn shrink_to_fit(&mut self) {
-        self.node.update_all_mut(|_,t| t.shrink_to_fit());
         self.node.shrink_to_fit();
+        self.node.update_all_mut(|_,t| t.shrink_to_fit());
     }
 
     // fn insert<I>(&mut self, mut s:I) where I:Iterator<Item = char> {
@@ -87,8 +87,8 @@ impl<'a> Iterator for Iter<'a> {
         };
         match end.next() {
             None => {
-                self.prefix.pop(); 
-                self.next()
+                self.prefix.pop();
+self.next()
             },
             Some(&(c, ref t)) => {
                 self.prefix.push(c);
@@ -97,5 +97,12 @@ impl<'a> Iterator for Iter<'a> {
                 if t.accept {Some(self.prefix.to_owned())} else {self.next()}
             }
         }
+    }
+}
+
+use heapsize::HeapSizeOf;
+impl HeapSizeOf for ArrayMapTrie {
+    fn heap_size_of_children(&self) -> usize {
+        self.node.view_content().heap_size_of_children()
     }
 }
