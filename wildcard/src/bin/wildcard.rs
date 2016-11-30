@@ -87,7 +87,7 @@ fn do_query<T>(t:&T,r:&T) where T:Trie {
 fn print_sizes<T>(t:&T,r:&T) where T:HeapSizeOf {
     let st = t.heap_size_of_children() as f64 / 1024.0 / 1024.0;
     let sr = r.heap_size_of_children() as f64 / 1024.0 / 1024.0;
-    println!("heap size of the trie: {:.2}MB", st);
-    println!("heap size of the reversed trie: {:.2}MB", sr);
-    println!("total heap sizes: {:.2}MB", st + sr);
+    println!("heap size of the trie: {:.2} MB", st);
+    println!("heap size of the reversed trie: {:.2} MB", sr);
+    println!("total heap sizes: {:.2} MB", st + sr);
 }
