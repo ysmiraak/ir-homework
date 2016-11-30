@@ -70,20 +70,6 @@ impl TernaryTrie {
         }
         (Some(t),ret)
     }
-
-    fn search_add(&self, p:&str, mut acc:Vec<String>) -> Vec<String> {
-        let n = match self.0 {
-            None => return acc,
-            Some(ref n) => n
-        };
-        acc = n.lo.search_add(p,acc);
-        acc = n.hi.search_add(p,acc);
-        let mut p = p.to_owned();
-        p.push(n.c);
-        acc = n.eq.search_add(&p,acc);
-        if n.accept {acc.push(p);}
-        acc
-    }
 }
 
 use std::fmt::{Display,Formatter,Result};
@@ -112,60 +98,51 @@ impl Trie for TernaryTrie {
     }
 
     fn prefix_search<'a,I>(&'a self, s:I) -> Box<Iterator<Item = String> + 'a>
-        where I:Iterator<Item = char> {
-            let ret = Vec::new();
+        where I:Iterator<Item = char> {        
         let p:String = s.collect();
-        let (t,add_p) = match self.search(p.chars()) {
-            (None,_) => return Box::new(ret.into_iter()),
-            (Some(t),add_p) => (t,add_p)
+        let (n,add_p) = match self.search(p.chars()) {
+            (None,_) => return Box::new(Vec::new().into_iter()),
+            (Some(t),add_p) => match t.0 {
+                None => return Box::new(Vec::new().into_iter()),
+                Some(ref n) => (n,add_p)
+            }
         };
-        let mut ret = t.search_add(&p,ret);
-        if add_p {ret.push(p);}
-        Box::new(ret.into_iter())
+        let init = if add_p {vec![p.to_owned()]} else {Vec::new()};
+        Box::new(init.into_iter().chain(Iter{stack:vec![(n,0)],prefix:p}))
     }
 }
 
-// #[derive(Clone)]
-// pub struct Iter {
-//     stack:Vec<TernaryTrie>,
-//     prefix:String,
-//     cons_prefix:bool
-// }
+#[derive(Clone)]
+pub struct Iter<'a> {
+    stack:Vec<(&'a TernaryTrieNode,u8)>,
+    prefix:String
+}
 
-// impl<'a> Iterator for Iter<'a> {
-//     type Item = String;
-//     fn next(&mut self) -> Option<String> {
-//         if self.cons_prefix {
-//             self.cons_prefix = false;
-//             return Some(self.prefix.to_owned())
-//         }
-//         let mut end = match self.stack.pop() {
-//             None => return None,
-//             Some(i) => i
-//         };
-//         match end.next() {
-//             None => {
-//                 self.prefix.pop(); 
-//                 self.next()
-//             },
-//             Some(&(c, ref t)) => {
-//                 self.prefix.push(c);
-//                 self.stack.push(end);
-//                 self.stack.push(t.node.iter());
-//                 match t.accept {
-//                     true => Some(self.prefix.to_owned()),
-//                     false => self.next()
-//                 }
-//             }
-//         }
-//     }
-// }
-
-// impl<'a> IntoIterator for &'a ArrayMapTrie {
-//     type Item = String;
-//     type IntoIter = Iter<'a>;
-//     fn into_iter(self) -> Self::IntoIter {
-//         self.iter()
-//     }   
-
-// }
+impl<'a> Iterator for Iter<'a> {
+    type Item = String;
+    fn next(&mut self) -> Option<String> {
+        let (end,act) = match self.stack.pop() {
+            None => return None,
+            Some(end) => end
+        };
+        let (next,opt_ret) = match act {
+            0 => (&end.lo,None),
+            1 => {
+                self.prefix.push(end.c);
+                let opt_ret = if end.accept {Some(self.prefix.to_owned())} else {None};
+                (&end.eq,opt_ret)
+            }
+            2 => {
+                self.prefix.pop();
+                (&end.hi,None)
+            }
+            _ => return self.next()
+        };
+        self.stack.push((end,act+1));
+        if let Some(ref n) = next.0 {self.stack.push((n,0))}
+        match opt_ret {
+            Some(s) => Some(s),
+            None => self.next()
+        }
+    }
+}
