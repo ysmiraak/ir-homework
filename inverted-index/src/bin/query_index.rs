@@ -1,5 +1,4 @@
-//! Author: Kuan Yu, 3913893
-//! Honor Code: I pledge that this program represents my own work.
+extern crate protocoll;
 
 use std::env::args;
 use std::process::exit;
@@ -7,7 +6,7 @@ use std::fs::File;
 use std::io::{BufReader,BufRead,stdin};
 use std::collections::HashMap;
 use std::hash::Hash;
-use std::borrow::Cow;
+use protocoll::set::VecSortedSet;
 
 fn main() {
     // let args:Vec<&str> = vec!["query-index","index.txt","tubadw-r1-ir-ids-100000.tab"];
@@ -20,7 +19,7 @@ fn main() {
         _ => { println!("usage: {} TERM_INDEX_FILE (INDEX_TITLE_FILE)", args[0]); exit(1)}
     };
 
-    let term2idxs:HashMap<String,Vec<u32>> = match File::open(&args[1]) {
+    let term2idxs:HashMap<String,VecSortedSet<u32>> = match File::open(&args[1]) {
         Err(_) => { println!("cannot open file for reading: {}", args[1]); exit(2)}
         Ok(file) => parse_to_map(BufReader::new(file), parse_term2idxs)
     };
@@ -51,8 +50,7 @@ fn main() {
         // sort and do AND query
         terms.sort_by(|a,b| a.len().cmp(&b.len()));
         let idxs = terms[1..].iter()
-            .fold(Cow::Borrowed(terms[0]), |a,b| Cow::Owned((&a).intersection(b)))
-            .into_owned();
+            .fold(terms[0].to_owned(), |a,&b| a & b.to_owned());
         for idx in idxs {
             match print_title {
                 true => println!("{}: {}", idx, idx2title.get(&idx).unwrap_or(&String::new())),
@@ -74,7 +72,7 @@ fn parse_to_map<F,K,V,R>(rdr:R, f:F) -> HashMap<K,V>
         .collect()
 }
 
-fn parse_term2idxs(line:String) -> Option<(String, Vec<u32>)> {
+fn parse_term2idxs(line:String) -> Option<(String, VecSortedSet<u32>)> {
     let x = match line.find('\t') {
         None => { println!("illformed: {}",line); return Option::None },
         Some(x) => x };
@@ -97,33 +95,4 @@ fn parse_idx2title(line:String) -> Option<(u32, String)> {
         Ok(idx) => idx };
     let title = line[x+1..].to_string();
     Option::Some((idx,title))
-}
-
-pub trait SortedSet<T> {
-    fn intersection(&self, s:&Self) -> Self;
-}
-
-impl<T> SortedSet<T> for Vec<T> where T:Ord+Copy {
-    /// author: [danieldk](https://github.com/danieldk/ir-examples)
-    fn intersection(&self, other:&Self) -> Self {
-        let mut inter = Vec::new();
-
-        let (smaller, larger) = if self.len() < other.len() {
-            (self, other)
-        } else {
-            (other, self)
-        };
-
-        let mut offset = 0;
-        for doc in smaller.into_iter() {
-            offset = match larger[offset..].binary_search(doc) {
-                Ok(idx) => {
-                    inter.push(*doc);
-                    idx
-                }
-                Err(idx) => idx,
-            }
-        }
-        inter
-    }
 }

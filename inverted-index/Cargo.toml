@@ -1,8 +1,8 @@
 [package]
-name = "create-index"
+name = "inverted-index"
 version = "0.1.0"
 authors = ["Kuan Yu <kuan.yu@student.uni-tuebingen.de>"]
 
 [dependencies]
 conllx = "0.3.1"
-protocoll = "0.2.1"
+protocoll = "0.3.0"

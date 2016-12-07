@@ -1,6 +1,3 @@
-//! Author: Kuan Yu, 3913893
-//! Honor Code: I pledge that this program represents my own work.
-
 extern crate conllx;
 extern crate protocoll;
 
@@ -10,7 +7,8 @@ use std::fs::File;
 use std::io::{BufReader,BufWriter,Write};
 use conllx::{Reader,Sentence};
 use std::collections::HashMap;
-use protocoll::{Map,Str};
+use protocoll::{MapMut,Str};
+use protocoll::set::VecSortedSet;
 
 fn main() {
     // let args:Vec<&str> = vec!["create-index","tubadw-r1-ir-sample-100000","index.txt"];
@@ -30,7 +28,7 @@ fn main() {
         Ok(file) => file
     };
 
-    let term2idxs:HashMap<String,Vec<u32>> =
+    let term2idxs:HashMap<String,VecSortedSet<u32>> =
         Reader::new(BufReader::new(conllx_in)).into_iter()
         .flat_map(|res_sent| match res_sent {
             Ok(sent) => sent,
@@ -41,9 +39,8 @@ fn main() {
         .filter_map(|(lem,feats)| match feats.as_str().parse::<u32>() {
             Ok(idx) => Option::Some((lem,idx)),
             Err(_) => { println!("illformed: {}",feats); Option::None}})
-        .fold(HashMap::new(), |m,(k,i)| Map::update_in_place
-              (m, k, Vec::new(), |v| if let Err(idx) = v.binary_search(&i)
-               {Vec::insert(v,idx,i);}));
+        .fold(HashMap::new(), |mut m, (k, i)|
+              {m.update_mut(k, VecSortedSet::new(), |s| {s.insert(i);}); m});
 
     let mut wtr = BufWriter::new(index_out);
     for (term,idxs) in &term2idxs {
