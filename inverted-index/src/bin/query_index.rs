@@ -7,6 +7,7 @@ use std::io::{BufReader,BufRead,stdin};
 use std::collections::HashMap;
 use std::hash::Hash;
 use protocoll::set::VecSortedSet;
+use std::borrow::Cow;
 
 fn main() {
     // let args:Vec<&str> = vec!["query-index","index.txt","tubadw-r1-ir-ids-100000.tab"];
@@ -50,7 +51,8 @@ fn main() {
         // sort and do AND query
         terms.sort_by(|a,b| a.len().cmp(&b.len()));
         let idxs = terms[1..].iter()
-            .fold(terms[0].to_owned(), |a,&b| a & b.to_owned());
+            .fold(Cow::Borrowed(terms[0]), |a,b| Cow::Owned(&*a & b))
+            .into_owned();
         for idx in idxs {
             match print_title {
                 true => println!("{}: {}", idx, idx2title.get(&idx).unwrap_or(&String::new())),
