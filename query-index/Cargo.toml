@@ -1,0 +1,12 @@
+[package]
+name = "query-index"
+version = "0.1.0"
+authors = ["Kuan Yu <kuan.yu@student.uni-tuebingen.de>"]
+
+[dependencies]
+getopts = "0.2"
+protocoll = "0.3.1"
+itertools = "0.5.4"
+ordered-float = "0.3.0"
+porter-stemmer = "0.1.1"
+stemmer = "0.3.2"
