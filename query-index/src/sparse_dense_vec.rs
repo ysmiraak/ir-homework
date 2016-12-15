@@ -173,8 +173,7 @@ impl<T> FromIterator<(usize, T)> for DenseVec<T> {
         for (i, e) in iter {
             ret.insert(i, e);
         }
-        ret.vec.shrink_to_fit();
-        ret
+        ret.shrink()
     }
 }
 
