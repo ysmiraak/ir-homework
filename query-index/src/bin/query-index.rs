@@ -37,28 +37,8 @@ fn main() {
 
     let i = BufReader::new(open_file(&matches.opt_str("i").unwrap()));
     let t = BufReader::new(open_file(&matches.opt_str("t").unwrap()));
-    let s: Box<FnMut(&str) -> String> =
-        match matches.opt_str("s").unwrap_or("none".to_owned()).as_ref() {
-            "none" => Box::new(|s| s.to_owned()),
-            "porter" => Box::new(|s| stem(s)),
-            "snowball" => {
-                let mut stemmer = Stemmer::new("english").unwrap();
-                Box::new(move |s| stemmer.stem(s))
-            }
-            unk => {
-                println!("unknown stemmer: {}", unk);
-                exit(1)
-            }
-        };
-    let w = match matches.opt_str("w").unwrap_or("identity".to_owned()).as_ref() {
-        "identity" => identity_tf,
-        "binary" => binary_tf,
-        "sublinear" => sublinear_tf,
-        unk => {
-            println!("unknown weighting: {}", unk);
-            exit(1)
-        }
-    };
+    let s = choose_stemmer(&matches.opt_str("s").unwrap_or("none".to_owned()));
+    let w = choose_weighting(&matches.opt_str("w").unwrap_or("identity".to_owned()));
     do_query(i, t, s, w)
 }
 
@@ -72,12 +52,41 @@ fn open_file(path: &str) -> File {
     }
 }
 
-fn do_query<R,W>(index: R, titles: R, mut stem: Box<FnMut(&str) -> String>, weight: W)
-    where R:BufRead, W: Fn(usize) -> f64
+fn choose_stemmer(alt: &str) -> Box<FnMut(&str) -> String> {
+    match alt.as_ref() {
+        "none" => Box::new(|s| s.to_owned()),
+        "porter" => Box::new(|s| stem(s)),
+        "snowball" => {
+            let mut stemmer = Stemmer::new("english").unwrap();
+            Box::new(move |s| stemmer.stem(s))
+        }
+        unk => {
+            println!("unknown stemmer: {}", unk);
+            exit(1)
+        }
+    }
+}
+
+fn choose_weighting(alt: &str) -> Box<Fn(usize) -> f64> {
+    match alt.as_ref() {
+        "identity" => Box::new(identity_tf),
+        "binary" => Box::new(binary_tf),
+        "sublinear" => Box::new(sublinear_tf),
+        unk => {
+            println!("unknown weighting: {}", unk);
+            exit(1)
+        }
+    }
+}
+
+fn do_query<R>(index: R, titles: R,
+               mut stem: Box<FnMut(&str) -> String>,
+               weight: Box<Fn(usize) -> f64>)
+    where R:BufRead
 {
     let doc2titles = load_titles(titles);
     let inv_index = InvertedIndex::load(index);
-    let processor = QueryProcessor::new(&inv_index, doc2titles.len(), &weight);
+    let processor = QueryProcessor::new(&inv_index, doc2titles.len(), |tf| weight(tf));
 
     let stdin = stdin();
     for res_line in stdin.lock().lines() {
@@ -108,5 +117,5 @@ fn load_titles<R>(rdr: R) -> DenseVec<String> where R: BufRead {
             let line = res_line.unwrap();
             let x = line.find('\t').unwrap();
             (line[..x].parse::<usize>().unwrap(), line[x + 1..].to_string())
-        }).collect()
+        }).collect::<DenseVec<_>>().shrink()
 }

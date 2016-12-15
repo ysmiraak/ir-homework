@@ -28,31 +28,31 @@ pub fn sublinear_tf(tf: usize) -> f64 {
 }
 
 pub struct QueryProcessor<'a,'b> {
-    weight_tf: &'b Fn(usize) -> f64,
+    weight_tf: Box<Fn(usize) -> f64 + 'b>,
     inv_index: &'a InvertedIndex,
     doc_norms: DenseVec<f64>
 }
 
-
 impl<'a,'b> QueryProcessor<'a,'b> {
-    pub fn new<F>(inv_index: &'a InvertedIndex, doc_count: usize, weight_tf: &'b F) -> Self
-        where F: Fn(usize) -> f64
+    pub fn new<F>(inv_index: &'a InvertedIndex, doc_count: usize, weight_tf: F) -> Self
+        where F: Fn(usize) -> f64 + 'b
     {
         let ln_dc = f64::ln(doc_count as f64);
+        let doc_norms = inv_index.view_content().iter()
+            .flat_map(|(_, doc2tf)| {
+                let ln_df = f64::ln(doc2tf.len() as f64);
+                doc2tf.iter().zip(repeat(ln_df))
+                    .map(|(&(doc, tf), ln_df)| {
+                        let _tfidf = weight_tf(tf) * (ln_dc - ln_df);
+                        (doc, _tfidf * _tfidf)})})
+            .fold(DenseVec::new(), |doc_sum_sqs, (doc, sq)| doc_sum_sqs
+                  .update(doc, |opt_sum_sqs| sq + opt_sum_sqs.unwrap_or_default()))
+            .update_all(f64::sqrt)
+            .shrink();
         QueryProcessor {
-            weight_tf: weight_tf,
+            weight_tf: Box::new(weight_tf),
             inv_index: inv_index,
-            doc_norms: inv_index.view_content().iter()
-                .flat_map(|(_, doc2tf)| {
-                    let ln_df = f64::ln(doc2tf.len() as f64);
-                    doc2tf.iter().zip(repeat(ln_df))
-                        .map(|(&(doc, tf), ln_df)| {
-                            let _tfidf = weight_tf(tf) * (ln_dc - ln_df);
-                            (doc, _tfidf * _tfidf)})})
-                .fold(DenseVec::new(), |doc_sum_sqs, (doc, sq)| doc_sum_sqs
-                      .update(doc, |opt_sum_sqs| sq + opt_sum_sqs.unwrap_or_default()))
-                .update_all(f64::sqrt)
-                .shrink()
+            doc_norms: doc_norms
         }
     }
 
@@ -63,8 +63,8 @@ impl<'a,'b> QueryProcessor<'a,'b> {
         }
     }
 
-    pub fn _tfidf(&self, tf:usize, idf:f64) -> f64 {
-        (self.weight_tf)(tf) * idf
+    pub fn weight_tf(&self, tf:usize) -> f64 {
+        (self.weight_tf)(tf)
     }
 
     pub fn process(&self, query: &[String]) -> BinaryHeap<DocSim> {
@@ -76,7 +76,7 @@ impl<'a,'b> QueryProcessor<'a,'b> {
                   |(idfs, q_vec, doc_tf_iters), &(t, tf)| {
                       let idf = self.idf(t);
                       (idfs.inc(idf),
-                       q_vec.inc(self._tfidf(tf, idf)),
+                       q_vec.inc(idf * self.weight_tf(tf)),
                        doc_tf_iters.inc(self.inv_index.get(t).unwrap_or(&dummy).iter().peekable()))
                   });
         let q_norm = f64::sqrt(dot(&q_vec, &q_vec));
@@ -100,7 +100,7 @@ impl<'a,'b> QueryProcessor<'a,'b> {
                     Some(&&(d, tf)) =>
                         if d == doc {
                             doc_tf_iter.next();
-                            d_vec.push(self._tfidf(tf, idf))
+                            d_vec.push(idf * self.weight_tf(tf))
                         } else {
                             d_vec.push(0.0)
                         },
