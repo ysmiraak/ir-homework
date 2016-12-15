@@ -26,7 +26,7 @@ fn main() {
         .optopt("w", "weighting",
                 "for the term frequencies: `binary`, `sublinear`, or `identity` by default.",
                 "WEIGHTING");
-    
+
     let matches = match opts.parse(args().skip(1)) {
         Err(e) => {
             println!("{}", opts.usage(&e.to_string()));
@@ -34,7 +34,7 @@ fn main() {
         }
         Ok(m) => m,
     };
-    
+
     let i = BufReader::new(open_file(&matches.opt_str("i").unwrap()));
     let t = BufReader::new(open_file(&matches.opt_str("t").unwrap()));
     let s: Box<FnMut(&str) -> String> =
@@ -85,7 +85,7 @@ fn do_query<R,W>(index: R, titles: R, mut stem: Box<FnMut(&str) -> String>, weig
             .map(|s| stem(&s.to_lowercase()))
             .collect::<Vec<_>>();
         for term in &query {
-            println!("idx({}) = {}", term, processor.idf(term))
+            println!("idf({}) = {}", term, processor.idf(term))
         }
         let mut results = processor.process(&query);
         let mut n = 0;

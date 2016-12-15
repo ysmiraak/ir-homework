@@ -125,10 +125,8 @@ impl<T> DenseVec<T> {
         where F: FnOnce(Option<T>) -> T
     {
         let old = self.make_space(i);
-        if old.is_none() {
-            self.len += 1
-        }
         replace(&mut self.vec[i], Some(f(old)));
+        self.len += 1;
         self
     }
 
@@ -158,6 +156,11 @@ impl<T> DenseVec<T> {
                 None => None
             };
         }
+        self
+    }
+
+    pub fn shrink(mut self) -> Self {
+        self.vec.shrink_to_fit();
         self
     }
 }

@@ -33,6 +33,7 @@ pub struct QueryProcessor<'a,'b> {
     doc_norms: DenseVec<f64>
 }
 
+
 impl<'a,'b> QueryProcessor<'a,'b> {
     pub fn new<F>(inv_index: &'a InvertedIndex, doc_count: usize, weight_tf: &'b F) -> Self
         where F: Fn(usize) -> f64
@@ -46,11 +47,12 @@ impl<'a,'b> QueryProcessor<'a,'b> {
                     let ln_df = f64::ln(doc2tf.len() as f64);
                     doc2tf.iter().zip(repeat(ln_df))
                         .map(|(&(doc, tf), ln_df)| {
-                            let tfidf = weight_tf(tf) * (ln_dc - ln_df);
-                            (doc, tfidf * tfidf)
-                        })
-                }).collect::<DenseVec<_>>()
+                            let _tfidf = weight_tf(tf) * (ln_dc - ln_df);
+                            (doc, _tfidf * _tfidf)})})
+                .fold(DenseVec::new(), |doc_sum_sqs, (doc, sq)| doc_sum_sqs
+                      .update(doc, |opt_sum_sqs| sq + opt_sum_sqs.unwrap_or_default()))
                 .update_all(f64::sqrt)
+                .shrink()
         }
     }
 
@@ -94,8 +96,8 @@ impl<'a,'b> QueryProcessor<'a,'b> {
             };
             let mut d_vec = Vec::new();
             for (doc_tf_iter, &idf) in doc_tf_iters.iter_mut().zip(idfs.iter()) {
-                match doc_tf_iter.peek() {                    
-                    Some(&&(d, tf)) => 
+                match doc_tf_iter.peek() {
+                    Some(&&(d, tf)) =>
                         if d == doc {
                             doc_tf_iter.next();
                             d_vec.push(self._tfidf(tf, idf))
