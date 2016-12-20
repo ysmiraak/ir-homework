@@ -6,6 +6,7 @@ extern crate getopts;
 use query_index::query_processor::{QueryProcessor, identity_tf, binary_tf, sublinear_tf};
 use query_index::inverted_index::InvertedIndex;
 use query_index::sparse_dense_vec::DenseVec;
+use query_index::error::{LoadError, FormatError};
 use porter_stemmer::stem;
 use stemmer::Stemmer;
 use getopts::Options;
@@ -83,7 +84,7 @@ fn do_query<R>(index: R, titles: R,
                weight_tf: fn(usize) -> f64)
     where R:BufRead
 {
-    let doc2titles = load_titles(titles);
+    let doc2titles = load_titles(titles).unwrap();
     let inv_index = InvertedIndex::load(index).unwrap();
     let processor = QueryProcessor::new(&inv_index, doc2titles.len(), weight_tf);
 
@@ -96,6 +97,7 @@ fn do_query<R>(index: R, titles: R,
             println!("idf({}) = {}", term, processor.idf(term))
         }
         let mut results = processor.process(&query);
+        let missing_title = String::new();
         let mut n = 0;
         while n < MAX_MATCH {
             n += 1;
@@ -103,18 +105,19 @@ fn do_query<R>(index: R, titles: R,
                 Some(doc_sim) =>
                     println!("{} ({}): {}",
                              doc_sim.doc(), doc_sim.sim(),
-                             doc2titles.get(doc_sim.doc()).unwrap()),
+                             doc2titles.get(doc_sim.doc()).unwrap_or(&missing_title)),
                 None => break
             }
         }
     }
 }
 
-fn load_titles<R>(rdr: R) -> DenseVec<String> where R: BufRead {
-    rdr.lines()
-        .map(|res_line| {
-            let line = res_line.unwrap();
-            let x = line.find('\t').unwrap();
-            (line[..x].parse::<usize>().unwrap(), line[x + 1..].to_string())
-        }).collect::<DenseVec<_>>().shrink()
+fn load_titles<R>(rdr: R) -> Result<DenseVec<String>, LoadError> where R: BufRead {
+    let mut ret = DenseVec::new();
+    for res_line in rdr.lines() {
+        let line = try!(res_line);
+        let x = try!(line.find('\t').ok_or(FormatError::new(&line)));
+        ret.insert(try!(line[..x].parse::<usize>()), line[x+1..].to_string());
+    }
+    Ok(ret.shrink())
 }
