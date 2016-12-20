@@ -1,11 +1,10 @@
-use protocoll::{Map, Seq};
+use protocoll::{Map, Set, Seq};
 use protocoll::map::VecSortedMap;
 use sparse_dense_vec::DenseVec;
 use inverted_index::{InvertedIndex, PostingList};
 use ordered_float::NotNaN;
 use std::iter::repeat;
-use std::cmp::Ordering;
-use std::collections::BinaryHeap;
+use std::collections::{BinaryHeap, HashSet};
 
 pub fn dot(v1: &[f64], v2: &[f64]) -> f64 {
     v1.iter().zip(v2.iter()).map(|(x1, x2)| x1 * x2).sum()
@@ -27,32 +26,31 @@ pub fn sublinear_tf(tf: usize) -> f64 {
     }
 }
 
-pub struct QueryProcessor<'a,'b> {
-    weight_tf: Box<Fn(usize) -> f64 + 'b>,
+pub struct QueryProcessor<'a> {
+    weight_tf: fn(usize) -> f64,
     inv_index: &'a InvertedIndex,
     doc_norms: DenseVec<f64>
 }
 
-impl<'a,'b> QueryProcessor<'a,'b> {
-    pub fn new<F>(inv_index: &'a InvertedIndex, doc_count: usize, weight_tf: F) -> Self
-        where F: Fn(usize) -> f64 + 'b
+impl<'a> QueryProcessor<'a> {
+    pub fn new(inv_index: &'a InvertedIndex, doc_count: usize,
+               weight_tf: fn(usize) -> f64) -> Self
     {
         let ln_dc = f64::ln(doc_count as f64);
-        let doc_norms = inv_index.view_content().iter()
-            .flat_map(|(_, doc2tf)| {
-                let ln_df = f64::ln(doc2tf.len() as f64);
-                doc2tf.iter().zip(repeat(ln_df))
-                    .map(|(&(doc, tf), ln_df)| {
-                        let _tfidf = weight_tf(tf) * (ln_dc - ln_df);
-                        (doc, _tfidf * _tfidf)})})
-            .fold(DenseVec::new(), |doc_sum_sqs, (doc, sq)| doc_sum_sqs
-                  .update(doc, |opt_sum_sqs| sq + opt_sum_sqs.unwrap_or_default()))
-            .update_all(f64::sqrt)
-            .shrink();
         QueryProcessor {
-            weight_tf: Box::new(weight_tf),
+            weight_tf: weight_tf,
             inv_index: inv_index,
-            doc_norms: doc_norms
+            doc_norms: inv_index.view_content().values()
+                .flat_map(|doc2tf| {
+                    let ln_df = f64::ln(doc2tf.len() as f64);
+                    doc2tf.iter().zip(repeat(ln_df))
+                        .map(|(&(doc, tf), ln_df)| {
+                            let _tfidf = weight_tf(tf) * (ln_dc - ln_df);
+                            (doc, _tfidf * _tfidf)})})
+                .fold(DenseVec::new(), |doc_sum_sqs, (doc, sq)| doc_sum_sqs
+                      .update(doc, |opt_sum_sqs| sq + opt_sum_sqs.unwrap_or_default()))
+                .update_all(f64::sqrt)
+                .shrink()
         }
     }
 
@@ -69,55 +67,36 @@ impl<'a,'b> QueryProcessor<'a,'b> {
 
     pub fn process(&self, query: &[String]) -> BinaryHeap<DocSim> {
         let dummy = PostingList::new();
-        let (idfs, q_vec, mut doc_tf_iters) = query.iter()
+
+        let (idfs, q_vec, doc2tf_vec, docs) = query.iter()
             .fold(VecSortedMap::new(), // frequencies of the query terms
                   |t2tf, t| t2tf.update(t, |opt_tf| 1 + opt_tf.unwrap_or(0))).iter()
-            .fold((Vec::new(), Vec::new(), Vec::new()),
-                  |(idfs, q_vec, doc_tf_iters), &(t, tf)| {
+            .fold((Vec::new(), Vec::new(), Vec::new(), HashSet::new()),
+                  |(idfs, q_vec, doc2tf_vec, docs), &(t, tf)| {
                       let idf = self.idf(t);
+                      let doc2tf = self.inv_index.get(t).unwrap_or(&dummy);
                       (idfs.inc(idf),
                        q_vec.inc(idf * self.weight_tf(tf)),
-                       doc_tf_iters.inc(self.inv_index.get(t).unwrap_or(&dummy).iter().peekable()))
+                       doc2tf_vec.inc(doc2tf),
+                       docs.plus(doc2tf.iter().map(|&(d, _)| d)))
                   });
+
         let q_norm = f64::sqrt(dot(&q_vec, &q_vec));
-        let mut ret = BinaryHeap::new();
-        loop {
-            let mut opt_doc = None;
-            for doc_tf_iter in &mut doc_tf_iters {
-                match (opt_doc, doc_tf_iter.peek()) {
-                    (None, Some(&&(d, _))) => opt_doc = Some(d),
-                    (Some(doc), Some(&&(d, _))) => if d < doc { opt_doc = Some(d)},
-                    _ => ()
-                }
-            }
-            let doc = match opt_doc {
-                Some(doc) => doc,
-                None => break
-            };
-            let mut d_vec = Vec::new();
-            for (doc_tf_iter, &idf) in doc_tf_iters.iter_mut().zip(idfs.iter()) {
-                match doc_tf_iter.peek() {
-                    Some(&&(d, tf)) =>
-                        if d == doc {
-                            doc_tf_iter.next();
-                            d_vec.push(idf * self.weight_tf(tf))
-                        } else {
-                            d_vec.push(0.0)
-                        },
-                    None => d_vec.push(0.0)
-                }
-            }
-            let d_norm = match self.doc_norms.get(doc) {
-                Some(&norm) => norm,
-                None => 0.0
-            };
-            ret.push(DocSim::new(doc, dot(&q_vec, &d_vec) / (q_norm * d_norm)));
-        }
-        ret
+
+        docs.iter().fold(BinaryHeap::new(), |ret, &doc| {
+            let d_vec = doc2tf_vec.iter().zip(idfs.iter())
+                .map(|(doc2tf, idf)| idf *
+                     self.weight_tf(doc2tf.get(&doc).map(ToOwned::to_owned).unwrap_or_default()))
+                .collect::<Vec<_>>();
+
+            let d_norm = self.doc_norms.get(doc).map(ToOwned::to_owned).unwrap_or_default();
+
+            ret.inc(DocSim::new(doc, dot(&q_vec, &d_vec) / (q_norm * d_norm)))
+        })
     }
 }
 
-#[derive(Debug,Default,Clone,PartialEq,Eq,Hash)]
+#[derive(Debug,Default,Clone,PartialEq,Eq,PartialOrd,Ord,Hash)]
 pub struct DocSim {
     sim: NotNaN<f64>,
     doc: usize
@@ -137,17 +116,5 @@ impl DocSim {
 
     pub fn sim(&self) -> f64 {
         *self.sim.as_ref()
-    }
-}
-
-impl PartialOrd for DocSim {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        self.sim.partial_cmp(&other.sim)
-    }
-}
-
-impl Ord for DocSim {
-    fn cmp(&self, other: &Self) -> Ordering {
-        self.sim.cmp(&other.sim)
     }
 }

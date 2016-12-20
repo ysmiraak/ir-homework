@@ -35,11 +35,10 @@ fn main() {
         Ok(m) => m,
     };
 
-    let i = BufReader::new(open_file(&matches.opt_str("i").unwrap()));
-    let t = BufReader::new(open_file(&matches.opt_str("t").unwrap()));
-    let s = choose_stemmer(&matches.opt_str("s").unwrap_or("none".to_owned()));
-    let w = choose_weighting(&matches.opt_str("w").unwrap_or("identity".to_owned()));
-    do_query(i, t, s, w)
+    do_query(BufReader::new(open_file(&matches.opt_str("i").unwrap())),
+             BufReader::new(open_file(&matches.opt_str("t").unwrap())),
+             choose_stemmer(&matches.opt_str("s").unwrap_or("none".to_owned())),
+             choose_weighting(&matches.opt_str("w").unwrap_or("identity".to_owned())))
 }
 
 fn open_file(path: &str) -> File {
@@ -67,11 +66,11 @@ fn choose_stemmer(alt: &str) -> Box<FnMut(&str) -> String> {
     }
 }
 
-fn choose_weighting(alt: &str) -> Box<Fn(usize) -> f64> {
+fn choose_weighting(alt: &str) -> fn(usize) -> f64 {
     match alt.as_ref() {
-        "identity" => Box::new(identity_tf),
-        "binary" => Box::new(binary_tf),
-        "sublinear" => Box::new(sublinear_tf),
+        "identity" => identity_tf,
+        "binary" => binary_tf,
+        "sublinear" => sublinear_tf,
         unk => {
             println!("unknown weighting: {}", unk);
             exit(1)
@@ -81,12 +80,12 @@ fn choose_weighting(alt: &str) -> Box<Fn(usize) -> f64> {
 
 fn do_query<R>(index: R, titles: R,
                mut stem: Box<FnMut(&str) -> String>,
-               weight: Box<Fn(usize) -> f64>)
+               weight_tf: fn(usize) -> f64)
     where R:BufRead
 {
     let doc2titles = load_titles(titles);
-    let inv_index = InvertedIndex::load(index);
-    let processor = QueryProcessor::new(&inv_index, doc2titles.len(), |tf| weight(tf));
+    let inv_index = InvertedIndex::load(index).unwrap();
+    let processor = QueryProcessor::new(&inv_index, doc2titles.len(), weight_tf);
 
     let stdin = stdin();
     for res_line in stdin.lock().lines() {
