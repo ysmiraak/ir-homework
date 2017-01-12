@@ -1,0 +1,9 @@
+[package]
+name = "doc-class"
+version = "0.1.0"
+authors = ["Kuan Yu <kuan.yu@student.uni-tuebingen.de>"]
+
+[dependencies]
+getopts = "0.2"
+conllx = "0.3.2"
+protocoll = "0.3.1"
