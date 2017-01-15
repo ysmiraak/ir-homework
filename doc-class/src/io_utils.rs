@@ -4,7 +4,9 @@ use std::process::exit;
 use std::io;
 
 /// useful in main.
-pub fn open_file<P>(path: P) -> File where P: AsRef<Path>{
+pub fn open_file<P>(path: P) -> File
+    where P: AsRef<Path>
+{
     match File::open(&path) {
         Err(_) => {
             println!("cannot open file: {:?}", path.as_ref());
@@ -15,7 +17,9 @@ pub fn open_file<P>(path: P) -> File where P: AsRef<Path>{
 }
 
 /// useful in main.
-pub fn create_file<P>(path: P) -> File where P: AsRef<Path> {
+pub fn create_file<P>(path: P) -> File
+    where P: AsRef<Path>
+{
     match File::create(&path) {
         Err(_) => {
             println!("cannot create file: {:?}", path.as_ref());
@@ -26,18 +30,22 @@ pub fn create_file<P>(path: P) -> File where P: AsRef<Path> {
 }
 
 /// useful in main.
-pub fn iter_file_paths<P>(dir: P) -> FilePaths where P: AsRef<Path> {
+pub fn iter_file_paths<P>(dir: P) -> FilePaths
+    where P: AsRef<Path>
+{
     match file_paths(dir) {
         Err(err) => {
             println!("cannot open directory: {}", err);
             exit(1)
         }
-        Ok(file_paths) => file_paths
+        Ok(file_paths) => file_paths,
     }
 }
 
 /// returns an iterator which recursively list all `PathBuf` of files under `dir`.
-pub fn file_paths<P>(dir: P) -> io::Result<FilePaths> where P: AsRef<Path> {
+pub fn file_paths<P>(dir: P) -> io::Result<FilePaths>
+    where P: AsRef<Path>
+{
     let mut stack = Vec::new();
     stack.push(try!(read_dir(dir)));
     Ok(FilePaths(stack))

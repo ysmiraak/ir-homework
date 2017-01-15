@@ -1,4 +1,4 @@
-use std::collections::{HashMap};
+use std::collections::HashMap;
 
 /// injective mapping: str -> usize
 pub trait Numberer {

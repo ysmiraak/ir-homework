@@ -2,7 +2,7 @@ extern crate doc_class;
 extern crate getopts;
 extern crate conllx;
 
-use getopts::{Options};
+use getopts::Options;
 use std::path::Path;
 use std::ffi::OsStr;
 use std::env::args;
@@ -25,7 +25,7 @@ fn main() {
             .optopt("3", "trigram", "dimensions for trigrams hashing; default: `0`.", "")
             .optopt("t", "threshold", "the minimal ngram frequency; default: `1`.", "")
             .optopt("f", "feature", "`binary`, `tfidf`, `btfidf`, or `stfidf` by default.", "");
-            
+
         let matches = match opts.parse(args().skip(1)) {
             Err(e) => {
                 println!("{}", opts.usage(&e.to_string()));
@@ -33,7 +33,7 @@ fn main() {
             }
             Ok(m) => m,
         };
-        
+
         (matches.opt_str("i").unwrap(),
          matches.opt_str("o").unwrap_or("data.svm".to_owned()),
          matches.opt_str("1").unwrap_or_default().parse::<usize>().unwrap_or(usize::pow(2, 24)),
@@ -42,7 +42,7 @@ fn main() {
          matches.opt_str("t").unwrap_or_default().parse::<usize>().unwrap_or(1),
          match matches.opt_str("f").unwrap_or("stfidf".to_owned()).as_ref() {
              "binary" => binary,
-             "tfidf"  => tf_idf,
+             "tfidf" => tf_idf,
              "btfidf" => btf_idf,
              "stfidf" => stf_idf,
              unk => {
@@ -51,7 +51,7 @@ fn main() {
              }
          })
     };
-    
+
     println!("unigram dim: {}", n1);
     println!("bigram  dim: {}", n2);
     println!("trigram dim: {}", n3);
@@ -61,16 +61,17 @@ fn main() {
         let mut classes = HashMapNumberer::new();
         let mut labels = Vec::new();
         let mut inv_idx = InvertedIndex::new();
-        
+
         for file_path in file_paths {
             match file_path.parent()
                 .and_then(Path::file_name)
                 .and_then(OsStr::to_str) {
-                    None => continue,
-                    Some(label) => labels.push(classes.number(label))
-                }
+                None => continue,
+                Some(label) => labels.push(classes.number(label)),
+            }
 
-            let tokens = Reader::new(BufReader::new(open_file(&file_path))).sentences()
+            let tokens = Reader::new(BufReader::new(open_file(&file_path)))
+                .sentences()
                 .flat_map(|res_sent| res_sent.unwrap_or(Sentence::new(Vec::new())))
                 .map(|tok| tok.form().unwrap_or("").to_owned())
                 .collect::<Vec<_>>();
@@ -80,20 +81,20 @@ fn main() {
                 Box::new(sentinel.iter().map(ToOwned::to_owned));
             if n1 > 0 {
                 terms = Box::new(terms.chain(tokens.iter()
-                                             .map(|x| hash_code(x) % n1)));
+                    .map(|x| hash_code(x) % n1)));
             }
             if n2 > 0 {
                 terms = Box::new(terms.chain(tokens.iter()
-                                             .zip(tokens.iter().skip(1))
-                                             .map(|x| n1 + (hash_code(x) % n2))));
+                    .zip(tokens.iter().skip(1))
+                    .map(|x| n1 + (hash_code(x) % n2))));
             }
             if n3 > 0 {
                 terms = Box::new(terms.chain(tokens.iter()
-                                             .zip(tokens.iter().skip(1))
-                                             .zip(tokens.iter().skip(2))
-                                             .map(|x| n1 + n2 + (hash_code(x) % n3))));
+                    .zip(tokens.iter().skip(1))
+                    .zip(tokens.iter().skip(2))
+                    .map(|x| n1 + n2 + (hash_code(x) % n3))));
             }
-            
+
             inv_idx.inv_push(terms);
         }
 
@@ -110,7 +111,9 @@ fn main() {
     }
 }
 
-fn hash_code<T>(x: T) -> usize where T: Hash {
+fn hash_code<T>(x: T) -> usize
+    where T: Hash
+{
     let mut hasher = DefaultHasher::new();
     x.hash(&mut hasher);
     hasher.finish() as usize
