@@ -1,3 +1,6 @@
+// Author: Kuan Yu, 3913893
+// Honor Code:  I pledge that this program represents my own work.
+
 use std::fs::{read_dir, ReadDir, File};
 use std::path::{Path, PathBuf};
 use std::process::exit;

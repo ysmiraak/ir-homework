@@ -1,3 +1,6 @@
+// Author: Kuan Yu, 3913893
+// Honor Code:  I pledge that this program represents my own work.
+
 use std::collections::HashMap;
 
 /// injective mapping: str -> usize

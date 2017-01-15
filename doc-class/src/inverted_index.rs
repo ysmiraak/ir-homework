@@ -1,3 +1,6 @@
+// Author: Kuan Yu, 3913893
+// Honor Code:  I pledge that this program represents my own work.
+
 use sparse_vec::{SparseVec, scale_to_unit};
 use std::collections::HashMap;
 use protocoll::MapMut;
