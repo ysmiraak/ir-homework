@@ -1,10 +1,6 @@
 extern crate protocoll;
 
-pub mod error;
+pub mod io_utils;
 pub mod numberer;
+pub mod sparse_vec;
 pub mod inverted_index;
-
-pub mod sparse_vec {
-    use protocoll::map::VecSortedMap;
-    pub type SparseVec<T> = VecSortedMap<usize, T>;
-}

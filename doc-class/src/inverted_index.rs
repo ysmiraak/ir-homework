@@ -1,95 +1,97 @@
-use sparse_vec::SparseVec;
+use sparse_vec::{SparseVec, scale_to_unit};
 use protocoll::MapMut;
-use std::collections::HashMap;
-use std::f64;
 
-pub type PostingList = SparseVec<usize>;
+pub type PostingsList = SparseVec<usize>;
 
-#[derive(Debug,Default,Clone,PartialEq,Eq)]
 pub struct InvertedIndex {
-    inv_idx: HashMap<String, PostingList>,
-    num_doc: usize
+    inv_idx: Vec<PostingsList>,
+    doc_count: usize
 }
 
 impl InvertedIndex {
-    pub fn new() -> InvertedIndex {
+    pub fn new() -> Self {
         InvertedIndex {
-            inv_idx: HashMap::new(),
-            num_doc: 0
+            inv_idx: Vec::new(),
+            doc_count: 0
         }
     }
     
-    pub fn add_doc<I>(self, doc: I) -> Self where I: Iterator<Item = String> {
-        let n = self.num_doc;
+    pub fn inv_insert(&mut self, doc: usize, term: usize) {
+        if self.doc_count <= doc {
+            self.doc_count = doc + 1
+        }
+        self.ensure_size(term + 1);
+        self.inv_idx[term].update_mut(doc, 0, |n| *n += 1);
+        self.inv_idx[term].shrink_to_fit();
+    }
 
-        InvertedIndex {
-            inv_idx: doc.fold(self.inv_idx, |mut m, s| {
-                m.update_mut(s, PostingList::new(), |p| p.update_mut(n, 0, |c| *c += 1));
-                m
-            }),
-            num_doc: n + 1
+    pub fn inv_push<I>(&mut self, terms: I) where I: Iterator<Item = usize> {
+        let doc = self.doc_count;
+        for term in terms {
+            self.inv_insert(doc, term)
         }
     }
 
-    pub fn shrink(mut self) -> Self {
-        self.inv_idx.update_all_mut(|_, p| p.shrink_to_fit());
-        self.inv_idx.shrink_to_fit();
-        self
-    }
-
-    pub fn view_content(&self) -> &HashMap<String, PostingList> {
-        &self.inv_idx
-    }
-
-    pub fn features(&self) -> Vec<SparseVec<f64>> {
-        let mut doc_feats = Vec::new();
-        for _ in 0..self.num_doc {
-            doc_feats.push(SparseVec::new())
+    pub fn ensure_size(&mut self, size: usize) {
+        if self.inv_idx.len() < size {
+            self.inv_idx.resize(size, PostingsList::new());
         }
-        let mut idx = 0;
-        for (_, doc2tf) in &self.inv_idx {
-            let idf = f64::ln(self.num_doc as f64 / doc2tf.len() as f64);
-            if idf < 0.1 || 9.0 < idf { continue }
+    }
+
+    /// returns a document feature matrix;
+    /// `feat_fn` shoud compute a feature from `(term_freq, doc_freq, doc_count)`;
+    /// terms under `min_freq` are ignored.
+    pub fn doc_features(&self, feat_fn: fn(usize, usize, usize) -> f32, min_freq: usize)
+                        -> Vec<SparseVec<f32>>
+    {
+        let dc = self.doc_count;
+        let mut feat_mat = Vec::new();
+        feat_mat.resize(dc, SparseVec::new());
+        let mut dim = 0;
+        for doc2tf in &self.inv_idx {
+            let df = doc2tf.len();
+            if df < min_freq {continue}
             for &(doc, tf) in doc2tf {
-                doc_feats.get_mut(doc).unwrap().insert(idx, tf as f64 * idf);
+                feat_mat[doc].insert(dim, feat_fn(tf, df, dc));
             }
-            idx += 1;
+            dim += 1;
         }
-        println!("term count: {}", idx);
-        // let mut max = Vec::new();
-        // for _ in 0..self.inv_idx.len() {
-        //     max.push(0.0)
-        // }
-        // for idx2feat in &doc_feats {
-        //     for &(idx, feat) in idx2feat {
-        //         if feat > max[idx] {
-        //             max[idx] = feat
-        //         }
-        //     }
-        // }
-        // for idx2feat in &mut doc_feats {
-        //     idx2feat.update_all_mut(|&idx, feat| *feat = *feat / max[idx])
-        // }
-        doc_feats
+        for feat_vec in &mut feat_mat {
+            scale_to_unit(feat_vec)
+     }
+        println!("actual total dim: {}", dim);
+        feat_mat
     }
 }
 
-// pub fn dot(v1: &[f64], v2: &[f64]) -> f64 {
-//     v1.iter().zip(v2.iter()).map(|(x1, x2)| x1 * x2).sum()
-// }
+pub fn binary(tf: usize, _: usize, _: usize) -> f32 {
+    if tf > 0 { 1.0 } else { 0.0 }
+}
 
-// pub fn identity_tf(tf: usize) -> f64 {
-//     tf as f64
-// }
+pub fn tf_idf(tf: usize, df: usize, dc: usize) -> f32 {
+    tf as f32 * idf(dc, df)
+}
 
-// pub fn binary_tf(tf: usize) -> f64 {
-//     if tf > 0 { 1.0 } else { 0.0 }
-// }
+pub fn btf_idf(tf: usize, df: usize, dc: usize) -> f32 {
+    binary_tf(tf) * idf(dc, df)
+}
 
-// pub fn sublinear_tf(tf: usize) -> f64 {
-//     if tf > 0 {
-//         1.0 + f64::ln(tf as f64)
-//     } else {
-//         0.0
-//     }
-// }
+pub fn stf_idf(tf: usize, df: usize, dc: usize) -> f32 {
+    sublinear_tf(tf) * idf(dc, df)
+}
+
+pub fn idf(dc: usize, df: usize) -> f32 {
+    f32::ln(dc as f32 / df as f32)
+}
+
+pub fn binary_tf(tf: usize) -> f32 {
+    if tf > 0 { 1.0 } else { 0.0 }
+}
+
+pub fn sublinear_tf(tf: usize) -> f32 {
+    if tf > 0 {
+        1.0 + f32::ln(tf as f32)
+    } else {
+        0.0
+    }
+}
