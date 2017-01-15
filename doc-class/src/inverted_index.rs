@@ -1,17 +1,18 @@
 use sparse_vec::{SparseVec, scale_to_unit};
+use std::collections::HashMap;
 use protocoll::MapMut;
 
 pub type PostingsList = SparseVec<usize>;
 
 pub struct InvertedIndex {
-    inv_idx: Vec<PostingsList>,
+    inv_idx: HashMap<usize, PostingsList>,
     doc_count: usize
 }
 
 impl InvertedIndex {
     pub fn new() -> Self {
         InvertedIndex {
-            inv_idx: Vec::new(),
+            inv_idx: HashMap::new(),
             doc_count: 0
         }
     }
@@ -20,21 +21,15 @@ impl InvertedIndex {
         if self.doc_count <= doc {
             self.doc_count = doc + 1
         }
-        self.ensure_size(term + 1);
-        self.inv_idx[term].update_mut(doc, 0, |n| *n += 1);
-        self.inv_idx[term].shrink_to_fit();
+        self.inv_idx.entry(term)
+            .or_insert(PostingsList::new())
+            .update_mut(doc, 0, |n| *n += 1)
     }
 
     pub fn inv_push<I>(&mut self, terms: I) where I: Iterator<Item = usize> {
         let doc = self.doc_count;
         for term in terms {
             self.inv_insert(doc, term)
-        }
-    }
-
-    pub fn ensure_size(&mut self, size: usize) {
-        if self.inv_idx.len() < size {
-            self.inv_idx.resize(size, PostingsList::new());
         }
     }
 
@@ -48,7 +43,7 @@ impl InvertedIndex {
         let mut feat_mat = Vec::new();
         feat_mat.resize(dc, SparseVec::new());
         let mut dim = 0;
-        for doc2tf in &self.inv_idx {
+        for doc2tf in self.inv_idx.values() {
             let df = doc2tf.len();
             if df < min_freq {continue}
             for &(doc, tf) in doc2tf {

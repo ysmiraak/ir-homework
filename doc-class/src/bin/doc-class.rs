@@ -2,30 +2,30 @@ extern crate doc_class;
 extern crate getopts;
 extern crate conllx;
 
-use std::hash::{Hash, Hasher};
-use std::collections::hash_map::DefaultHasher;
-use conllx::{Reader, Sentence};
-use doc_class::numberer::{Numberer, HashMapNumberer};
-use doc_class::inverted_index::{InvertedIndex, binary, tf_idf, btf_idf, stf_idf};
-use doc_class::io_utils::{open_file, create_file, iter_file_paths};
 use getopts::{Options};
-use std::env::args;
-use std::process::exit;
-use std::io::{BufReader, BufWriter, Write};
 use std::path::Path;
 use std::ffi::OsStr;
+use std::env::args;
+use std::process::exit;
+use std::hash::{Hash, Hasher};
+use std::collections::hash_map::DefaultHasher;
+use std::io::{BufReader, BufWriter, Write};
+use conllx::{Reader, Sentence};
+use doc_class::io_utils::{open_file, create_file, iter_file_paths};
+use doc_class::numberer::{Numberer, HashMapNumberer};
+use doc_class::inverted_index::{InvertedIndex, binary, tf_idf, btf_idf, stf_idf};
 
 fn main() {
     let (path_in, path_out, n1, n2, n3, min_freq, feat_fn) = {
         let mut opts = Options::new();
-        opts.reqopt("i", "input", "with grouped conll files.", "DIRECTORY")
-            .optopt("o", "output", "for the output, or `data.svm` by default.", "FILENAME")
-            .optopt("1", "unigram", "for hashing unigrams, or `2^18` by default.", "DIMENSIONS")
-            .optopt("2", "bigram", "for hashing bigrams, or `0` by default.", "DIMENSIONS")
-            .optopt("3", "trigram", "for hashing trigrams, or `0` by default.", "DIMENSIONS")
-            .optopt("m", "min-freq", "for ngram frequencies, or `1` by default.", "THRESHOLD")
-            .optopt("f", "feature", "`binary`, `tfidf`, `btfidf`, or `stfidf` by default.",
-                    "FEATURE");
+        opts.reqopt("i", "input", "directory with grouped conll files.", "")
+            .optopt("o", "output", "filename for the output; default: `data.svm`.", "")
+            .optopt("1", "unigram", "dimensions for unigram hashing; default: `2^24`.", "")
+            .optopt("2", "bigram", "dimensions for bigram hashing; default: `0`.", "")
+            .optopt("3", "trigram", "dimensions for trigrams hashing; default: `0`.", "")
+            .optopt("t", "threshold", "the minimal ngram frequency; default: `1`.", "")
+            .optopt("f", "feature", "`binary`, `tfidf`, `btfidf`, or `stfidf` by default.", "");
+            
         let matches = match opts.parse(args().skip(1)) {
             Err(e) => {
                 println!("{}", opts.usage(&e.to_string()));
@@ -33,15 +33,16 @@ fn main() {
             }
             Ok(m) => m,
         };
+        
         (matches.opt_str("i").unwrap(),
          matches.opt_str("o").unwrap_or("data.svm".to_owned()),
-         matches.opt_str("1").unwrap_or_default().parse::<usize>().unwrap_or(0),
+         matches.opt_str("1").unwrap_or_default().parse::<usize>().unwrap_or(usize::pow(2, 24)),
          matches.opt_str("2").unwrap_or_default().parse::<usize>().unwrap_or(0),
          matches.opt_str("3").unwrap_or_default().parse::<usize>().unwrap_or(0),
-         matches.opt_str("m").unwrap_or_default().parse::<usize>().unwrap_or(1),
+         matches.opt_str("t").unwrap_or_default().parse::<usize>().unwrap_or(1),
          match matches.opt_str("f").unwrap_or("stfidf".to_owned()).as_ref() {
              "binary" => binary,
-             "tfidf" => tf_idf,
+             "tfidf"  => tf_idf,
              "btfidf" => btf_idf,
              "stfidf" => stf_idf,
              unk => {
@@ -60,7 +61,6 @@ fn main() {
         let mut classes = HashMapNumberer::new();
         let mut labels = Vec::new();
         let mut inv_idx = InvertedIndex::new();
-        inv_idx.ensure_size(n1 + n2 + n3);
         
         for file_path in file_paths {
             match file_path.parent()
@@ -101,10 +101,10 @@ fn main() {
     };
 
     let mut wtr = BufWriter::new(create_file(path_out));
-    for (label, feature) in labels.iter().zip(features.iter()) {
+    for (label, dim2feat) in labels.iter().zip(features.iter()) {
         write!(wtr, "{}", label).unwrap();
-        for &(idx, feat) in feature {
-            write!(wtr, " {}:{}", idx + 1, feat).unwrap();
+        for &(dim, feat) in dim2feat {
+            write!(wtr, " {}:{}", dim + 1, feat).unwrap();
         }
         writeln!(wtr).unwrap();
     }
