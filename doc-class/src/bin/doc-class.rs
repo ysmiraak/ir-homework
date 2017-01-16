@@ -18,6 +18,10 @@ use doc_class::io_utils::{open_file, create_file, iter_file_paths};
 use doc_class::numberer::{Numberer, HashMapNumberer};
 use doc_class::inverted_index::{InvertedIndex, binary, tf_idf, btf_idf, stf_idf};
 
+// const OPEN_CLASS: [&'static str; 21] =
+//     ["SYM", "UH", "FW", "VB", "VBD", "VBG", "VBN", "VBP", "VBZ", "RB", "RBR",
+//      "RBS", "JJ", "JJR", "JJS", "NN", "NNS", "NNP", "NNPS", "NP", "NPS"];
+
 fn main() {
     let (path_in, path_out, n1, n2, n3, min_freq, feat_fn) = {
         let mut opts = Options::new();
@@ -65,18 +69,28 @@ fn main() {
         let mut labels = Vec::new();
         let mut inv_idx = InvertedIndex::new();
 
+        // use std::collections::HashSet;
+        // let open_class = OPEN_CLASS.iter().map(ToOwned::to_owned).collect::<HashSet<_>>();
+
         for file_path in file_paths {
             match file_path.parent()
                 .and_then(Path::file_name)
                 .and_then(OsStr::to_str) {
-                None => continue,
-                Some(label) => labels.push(classes.number(label)),
-            }
+                    None => continue,
+                    Some(label) => labels.push(classes.number(label)),
+                }
 
             let tokens = Reader::new(BufReader::new(open_file(&file_path)))
                 .sentences()
                 .flat_map(|res_sent| res_sent.unwrap_or(Sentence::new(Vec::new())))
                 .map(|tok| tok.form().unwrap_or("").to_owned())
+            // .filter_map(|tok| tok.pos().and_then(
+            //     |pos| if open_class.contains(pos) {
+            //         tok.form().map(ToOwned::to_owned)
+            //     } else {
+            //         None
+            //     }
+            // ))
                 .collect::<Vec<_>>();
 
             let sentinel = Vec::<usize>::new();
@@ -84,18 +98,18 @@ fn main() {
                 Box::new(sentinel.iter().map(ToOwned::to_owned));
             if n1 > 0 {
                 terms = Box::new(terms.chain(tokens.iter()
-                    .map(|x| hash_code(x) % n1)));
+                                             .map(|x| hash_code(x) % n1)));
             }
             if n2 > 0 {
                 terms = Box::new(terms.chain(tokens.iter()
-                    .zip(tokens.iter().skip(1))
-                    .map(|x| n1 + (hash_code(x) % n2))));
+                                             .zip(tokens.iter().skip(1))
+                                             .map(|x| n1 + (hash_code(x) % n2))));
             }
             if n3 > 0 {
                 terms = Box::new(terms.chain(tokens.iter()
-                    .zip(tokens.iter().skip(1))
-                    .zip(tokens.iter().skip(2))
-                    .map(|x| n1 + n2 + (hash_code(x) % n3))));
+                                             .zip(tokens.iter().skip(1))
+                                             .zip(tokens.iter().skip(2))
+                                             .map(|x| n1 + n2 + (hash_code(x) % n3))));
             }
 
             inv_idx.inv_push(terms);
