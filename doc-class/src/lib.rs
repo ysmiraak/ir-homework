@@ -3,6 +3,7 @@
 
 extern crate protocoll;
 
+pub mod filters;
 pub mod io_utils;
 pub mod numberer;
 pub mod sparse_vec;

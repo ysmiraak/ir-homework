@@ -17,6 +17,7 @@ use conllx::{Reader, Sentence};
 use doc_class::io_utils::{open_file, create_file, iter_file_paths};
 use doc_class::numberer::{Numberer, HashMapNumberer};
 use doc_class::inverted_index::{InvertedIndex, binary, tf_idf, btf_idf, stf_idf};
+use doc_class::filters::{StopwordFilter, PTBStopwordFilter};
 
 // const OPEN_CLASS: [&'static str; 21] =
 //     ["SYM", "UH", "FW", "VB", "VBD", "VBG", "VBN", "VBP", "VBZ", "RB", "RBR",
@@ -72,6 +73,8 @@ fn main() {
         // use std::collections::HashSet;
         // let open_class = OPEN_CLASS.iter().map(ToOwned::to_owned).collect::<HashSet<_>>();
 
+        let filter = PTBStopwordFilter;
+
         for file_path in file_paths {
             match file_path.parent()
                 .and_then(Path::file_name)
@@ -83,7 +86,7 @@ fn main() {
             let tokens = Reader::new(BufReader::new(open_file(&file_path)))
                 .sentences()
                 .flat_map(|res_sent| res_sent.unwrap_or(Sentence::new(Vec::new())))
-                .map(|tok| tok.form().unwrap_or("").to_owned())
+            // .map(|tok| tok.form().unwrap_or("").to_owned())
             // .filter_map(|tok| tok.pos().and_then(
             //     |pos| if open_class.contains(pos) {
             //         tok.form().map(ToOwned::to_owned)
@@ -91,6 +94,18 @@ fn main() {
             //         None
             //     }
             // ))
+                .filter_map(|tok| {
+                    match (tok.form(), tok.pos(), tok.lemma()) {
+                        (Some(form), Some(pos), Some(lemma)) => {
+                            if filter.is_stopword(pos, lemma) {
+                                None
+                            } else {
+                                Some(form.to_owned())
+                            }
+                        },
+                        _ => None
+                    }
+                })
                 .collect::<Vec<_>>();
 
             let sentinel = Vec::<usize>::new();
