@@ -1,9 +1,11 @@
 // Author: Kuan Yu, 3913893
 // Honor Code:  I pledge that this program represents my own work.
 
+#[macro_use(s)]
 extern crate ndarray;
 
 use std::f32;
+use std::cmp::min;
 use ndarray::{ArrayBase, Array, Array1, Array2, Axis, RemoveAxis, Ix1, Ix2, Data, DataMut};
 
 /// ArrayBase1
@@ -30,18 +32,32 @@ pub fn step_sample<A, S, D>(data: &ArrayBase<S, D>, n: usize) -> Array<A, D>
 
 /// iterativelly recompute the `centroids` til convergence (with `epsilon` error
 /// tolerance), or until `iter_max` is reached. rows in `data` should be
-/// normalized unit vectors.
+/// normalized unit vectors. the shape of `data` be `(_, d)`, then the shape of
+/// `centroids` be `(k, d)`.
 pub fn kmeans<S>(data: &Matrix<S>,
                  mut centroids: Array2<f32>,
                  epsilon: f32, iter_max: usize, verbose: bool) -> Array2<f32>
     where S: Data<Elem = f32>
 {
+    let (k, d) = centroids.dim();
+    let n = data.rows() as isize;
+    let b = (300 * 1024 * 1024) / (8 * k) as isize;
+    // batched processing, much faster than going through each row separately,
+    // but also limit the memory usage: 300 mb here.
     for i in 0..iter_max {
         if verbose { println!("iteration {} ...", i+1);}
         let new_centroids = {
-            let mut cb = CentroidBuilder::new(centroids.rows(), centroids.cols());
-            for ref v in data.outer_iter() {
-                cb.inc(settle_to(v, &centroids), v);
+            let mut cb = CentroidBuilder::new(k, d);
+            let mut i = 0;
+            while i < n {
+                let j = min(i + b, n);
+                for (i, v) in centroids
+                    .dot(&data.slice(s![i..j, ..]).reversed_axes())
+                    .map_axis(Axis(0), |v| arg_max(&v))
+                    .into_iter()
+                    .zip(data.outer_iter())
+                { cb.inc(*i, &v);}
+                i += j;
             }
             cb.build(verbose)
         };
@@ -53,7 +69,7 @@ pub fn kmeans<S>(data: &Matrix<S>,
                     .collect::<Array1<f32>>();
                 let mean = diff.scalar_sum() / diff.len() as f32;
                 diff -= mean;
-                (mean, ((&diff * &diff).scalar_sum() / (diff.len() - 1) as f32).sqrt())
+                (mean, (diff.dot(&diff) / (diff.len() - 1) as f32).sqrt())
             };
             println!("shift of centroids:\tmean\t{}\tvar\t{}", mean, var);
         }
