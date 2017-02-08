@@ -102,7 +102,10 @@ pub fn arg_max<S>(v: &Vector<S>) -> usize where S: Data<Elem = f32> {
 
 /// scales `v` into a unit vector.
 pub fn normalize<S>(v: &mut Vector<S>) where S: DataMut<Elem = f32> {
-    *v /= v.dot(v).sqrt();
+    let norm = v.dot(v).sqrt();
+    if norm != 0.0 {
+        *v /= norm;
+    }
 }
 
 /// returns the euclidean distance between `v1` and `v2`.
