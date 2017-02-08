@@ -41,9 +41,9 @@ pub fn kmeans<S>(data: &Matrix<S>,
 {
     let (k, d) = centroids.dim();
     let n = data.rows() as isize;
-    let b = (300 * 1024 * 1024) / (8 * k) as isize;
+    let b = (250 * 1024 * 1024) / (8 * k) as isize;
     // batched processing, much faster than going through each row separately,
-    // but also limit the memory usage: 300 mb here.
+    // but also limit the additional memory usage: 250 mb.
     for i in 0..iter_max {
         if verbose { println!("iteration {} ...", i+1);}
         let new_centroids = {
@@ -57,7 +57,7 @@ pub fn kmeans<S>(data: &Matrix<S>,
                     .into_iter()
                     .zip(data.outer_iter())
                 { cb.inc(*i, &v);}
-                i += j;
+                i = j;
             }
             cb.build(verbose)
         };
@@ -100,7 +100,7 @@ pub fn arg_max<S>(v: &Vector<S>) -> usize where S: Data<Elem = f32> {
            }).0
 }
 
-/// scales `v` into a unit vector.
+/// scales `v` into a unit vector, or do nothing if `v` is a unit vector.
 pub fn normalize<S>(v: &mut Vector<S>) where S: DataMut<Elem = f32> {
     let norm = v.dot(v).sqrt();
     if norm != 0.0 {
@@ -135,18 +135,15 @@ impl CentroidBuilder {
     }
 
     fn build(mut self, verbose: bool) -> Array2<f32> {
-        for (i, n) in self.cnt.indexed_iter_mut() {
+        for (mut v, (i, n)) in self.acc.outer_iter_mut().zip(self.cnt.indexed_iter()) {
             if *n == 0.0 {
-                *n = 1.0;
                 if verbose {
                     println!("cluster {} is uninhabited. its centroid is now the origin.", i)
                 }
+            } else {
+                v /= *n;
+                normalize(&mut v);
             }
-        }
-        let d = self.cnt.dim();
-        self.acc /= &self.cnt.into_shape((d,1)).unwrap();
-        for ref mut v in self.acc.outer_iter_mut() {
-            normalize(v)
         }
         self.acc
     }

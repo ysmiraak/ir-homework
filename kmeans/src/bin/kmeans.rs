@@ -20,7 +20,7 @@ fn main() {
         opts.reqopt("i", "input", "the binary embeddings file.", "")
             .optopt("o", "output", "the output tsv file; default: `word_cluster.tsv`.", "")
             .optopt("k", "centers", "the number of clusters; default: `sqrt(|data|)`.", "")
-            .optopt("e", "epsilon", "tolerance for convergence; default: `0.05`.", "")
+            .optopt("e", "epsilon", "tolerance for convergence; default: `0.025`.", "")
             .optopt("m", "iter-max", "the maximum number of iterations; default: `25`.", "")
             .optopt("v", "verbose", "`false` or `true` by default.", "");
 
@@ -35,7 +35,7 @@ fn main() {
         (matches.opt_str("i").unwrap(),
          matches.opt_str("o").unwrap_or("word_cluster.tsv".to_owned()),
          matches.opt_str("k").unwrap_or_default().parse::<usize>().ok(),
-         matches.opt_str("e").unwrap_or_default().parse::<f32>().unwrap_or(0.05),
+         matches.opt_str("e").unwrap_or_default().parse::<f32>().unwrap_or(0.025),
          matches.opt_str("m").unwrap_or_default().parse::<usize>().unwrap_or(25),
          matches.opt_str("v").unwrap_or_default().parse::<bool>().unwrap_or(true))
     };
