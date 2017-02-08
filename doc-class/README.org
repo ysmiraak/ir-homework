@@ -1,0 +1,24 @@
+#+AUTHOR: Kuan Yu
+
+- removed hapaxes with `./doc-class -t 2 ...`
+- rows are always scaled to unit vectors
+- added bias for training: -B 1
+
+| sublinear-tf * idf | hash dims   | final dim | -c |    -v 10 |
+|--------------------+-------------+-----------+----+----------|
+| unigrams           | 2^24        |     82647 |  1 | 93.2813% |
+| unigrams + bigrams | 2^24 + 2^25 |    572331 | 11 | 94.0249% |
+
+I chose to use feature hashing for building the inverted index, because it worked
+pretty well as a replacement for string keys. This should help to reduce the
+memory usage for building features with larger ngrams. However, it seems that the
+data are not enough to make trigrams useful.
+
+Unigrams give better results than bigrams. In general, sublinear-tf-idf beats
+binary-tf-idf beats tf-idf beats binary features.
+
+I tried unigram models with only open-class words, but it did not improve the
+accuracy for me.
+
+Adding bigrams to unigrams results in six times more dimensions, but only about
+10% further error reduction.

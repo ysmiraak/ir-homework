@@ -1,0 +1,9 @@
+[package]
+name = "kmeans"
+version = "0.1.0"
+authors = ["Kuan Yu <kuan.yu@student.uni-tuebingen.de>"]
+
+[dependencies]
+getopts = "0.2"
+ndarray = "0.7.3"
+rust2vec = "0.1.0"
