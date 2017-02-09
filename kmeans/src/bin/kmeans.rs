@@ -12,16 +12,16 @@ use std::env::args;
 use std::process::exit;
 use std::io::{BufReader, BufWriter, Write};
 use rust2vec::{Embeddings, ReadWord2Vec};
-use kmeans::{kmeans, step_sample, settle_to};
+use kmeans::{kmeans, step_sample, arg_max};
 
 fn main() {
-    let (path_in, path_out, opt_k, epsilon, iter_max, verbose) = {
+    let (path_in, path_out, opt_k, epsilon, max_iter, verbose) = {
         let mut opts = Options::new();
         opts.reqopt("i", "input", "the binary embeddings file.", "")
             .optopt("o", "output", "the output tsv file; default: `word_cluster.tsv`.", "")
             .optopt("k", "centers", "the number of clusters; default: `sqrt(|data|)`.", "")
             .optopt("e", "epsilon", "tolerance for convergence; default: `0.05`.", "")
-            .optopt("m", "iter-max", "the maximum number of iterations; default: `25`.", "")
+            .optopt("m", "max-iter", "the maximum number of iterations; default: `25`.", "")
             .optopt("v", "verbose", "`false` or `true` by default.", "");
 
         let matches = match opts.parse(args().skip(1)) {
@@ -52,13 +52,13 @@ fn main() {
         let data = embeddings.data();
         let k = opt_k.unwrap_or(f32::sqrt(data.rows() as f32) as usize);
         if verbose { println!("number of clusters:\t{}", k);}
-        kmeans(&data, step_sample(&data, k), epsilon, iter_max, verbose)
+        kmeans(&data, step_sample(&data, k), epsilon, max_iter, verbose)
     };
 
     let mut wtr = BufWriter::new(create_file(&path_out));
     if verbose { println!("writing to {} ...", path_out);}
     for (word, embedding) in embeddings.iter() {
-        writeln!(wtr, "{}\t{}", word, settle_to(&embedding, &centroids)).unwrap();
+        writeln!(wtr, "{}\t{}", word, arg_max(&centroids.dot(&embedding))).unwrap();
     }
 }
 

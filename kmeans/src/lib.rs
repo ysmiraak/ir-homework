@@ -31,32 +31,31 @@ pub fn step_sample<A, S, D>(data: &ArrayBase<S, D>, n: usize) -> Array<A, D>
 //     where A: Copy, S: Data<Elem = A>, D: RemoveAxis
 
 /// iterativelly recompute the `centroids` til convergence (with `epsilon` error
-/// tolerance), or until `iter_max` is reached. rows in `data` should be
-/// normalized unit vectors. the shape of `data` be `(_, d)`, then the shape of
-/// `centroids` be `(k, d)`.
+/// tolerance), or til `max_iter` is reached. rows in `data` should be normalized
+/// unit vectors. when `data` has shape `(_, d)`, `centroids` has shape `(k, d)`.
 pub fn kmeans<S>(data: &Matrix<S>,
                  mut centroids: Array2<f32>,
-                 epsilon: f32, iter_max: usize, verbose: bool) -> Array2<f32>
+                 epsilon: f32, max_iter: usize, verbose: bool) -> Array2<f32>
     where S: Data<Elem = f32>
 {
-    let n = data.rows() as isize;
-    let b = (500 * 1024 * 1024 * 8) / (32 * centroids.rows()) as isize;
+    let total_rows = data.rows() as isize;
+    let batch_size = (500 * 1024 * 1024 * 8) / (32 * centroids.rows()) as isize;
     // batched processing, much faster than going through each row separately,
     // but also limit the additional memory usage to 500 mb here.
-    for i in 0..iter_max {
+    for i in 0..max_iter {
         if verbose { println!("iteration {} ...", i+1);}
         let new_centroids = {
             let mut new_centroids = Array2::zeros(centroids.dim());
             let mut i = 0;
-            while i < n {
-                let j = min(n, i + b);
+            while i < total_rows {
+                let j = min(i + batch_size, total_rows);
                 let batch = data.slice(s![i..j, ..]);
-                for (i, v) in centroids
+                for (&i, v) in centroids
                     .dot(&batch.t())
                     .map_axis(Axis(0), |v| arg_max(&v))
                     .into_iter()
                     .zip(batch.outer_iter())
-                { new_centroids.row_mut(*i) + &v;}
+                { new_centroids.row_mut(i) + &v;}
                 i = j;
             }
             for ref mut v in new_centroids.outer_iter_mut() {
@@ -65,16 +64,15 @@ pub fn kmeans<S>(data: &Matrix<S>,
             new_centroids
         };
         if verbose {
-            let (mean, var) = {
-                let mut diff = centroids.outer_iter()
-                    .zip(new_centroids.outer_iter())
-                    .map(|(v1, v2)| distance(&v1, &v2))
-                    .collect::<Array1<f32>>();
-                let mean = diff.scalar_sum() / diff.len() as f32;
-                diff -= mean;
-                (mean, (diff.dot(&diff) / (diff.len() - 1) as f32).sqrt())
-            };
-            println!("shift of centroids:\tmean\t{}\tvar\t{}", mean, var);
+            let mut diff = centroids.outer_iter()
+                .zip(new_centroids.outer_iter())
+                .map(|(v1, v2)| distance(&v1, &v2))
+                .collect::<Array1<f32>>();
+            let max = diff[arg_max(&diff)];
+            let mean = diff.mean(Axis(0));
+            diff -= &mean;
+            let var = (diff.dot(&diff) / (diff.len() - 1) as f32).sqrt();
+            println!("shift of centroids:\tmax\t{}\tmean\t{}\tvar\t{}", max, mean, var);
         }
         if centroids.all_close(&new_centroids, epsilon) {
             return new_centroids;
@@ -85,25 +83,19 @@ pub fn kmeans<S>(data: &Matrix<S>,
     centroids
 }
 
-/// returns the index of the closest centroid in `centroids` for `data`.
-pub fn settle_to<S1, S2>(data: &Vector<S1>, centroids: &Matrix<S2>) -> usize
-    where S1: Data<Elem = f32>, S2: Data<Elem = f32> {
-    arg_max(&centroids.dot(data))
-}
-
 /// seeing `v: index -> value`, returns the `index` which maximizes `value`, or
 /// `0` for an empty `v`.
 pub fn arg_max<S>(v: &Vector<S>) -> usize where S: Data<Elem = f32> {
     v.fold((0, 0, f32::NEG_INFINITY),
-           |(m, i, x), y|
-           if x < *y {
-               (i, i+1, *y)
+           |(m, i, x), &y|
+           if x < y {
+               (i, i+1, y)
            } else {
                (m, i+1, x)
            }).0
 }
 
-/// scales `v` into a unit vector, or do nothing if `v` is a unit vector.
+/// scales `v` into a unit vector, or do nothing if `v` is a null vector.
 pub fn normalize<S>(v: &mut Vector<S>) where S: DataMut<Elem = f32> {
     let norm = v.dot(v).sqrt();
     if norm != 0.0 {
