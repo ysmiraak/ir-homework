@@ -41,9 +41,9 @@ pub fn kmeans<S>(data: &Matrix<S>,
 {
     let (k, d) = centroids.dim();
     let n = data.rows() as isize;
-    let b = (250 * 1024 * 1024) / (8 * k) as isize;
+    let b = (250 * 1024 * 1024 * 8) / (32 * k) as isize;
     // batched processing, much faster than going through each row separately,
-    // but also limit the additional memory usage: 250 mb.
+    // but also limit the additional memory usage to 250 mb here.
     for i in 0..iter_max {
         if verbose { println!("iteration {} ...", i+1);}
         let new_centroids = {
@@ -51,11 +51,12 @@ pub fn kmeans<S>(data: &Matrix<S>,
             let mut i = 0;
             while i < n {
                 let j = min(i + b, n);
+                let batch = data.slice(s![i..j, ..]);
                 for (i, v) in centroids
-                    .dot(&data.slice(s![i..j, ..]).reversed_axes())
+                    .dot(&batch.t())
                     .map_axis(Axis(0), |v| arg_max(&v))
                     .into_iter()
-                    .zip(data.outer_iter())
+                    .zip(batch.outer_iter())
                 { cb.inc(*i, &v);}
                 i = j;
             }
