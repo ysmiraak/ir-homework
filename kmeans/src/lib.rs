@@ -30,9 +30,9 @@ pub fn step_sample<A, S, D>(data: &ArrayBase<S, D>, n: usize) -> Array<A, D>
 // pub fn randome_sample<A, S, D>(data: &ArrayBase<S, D>, n: usize, seed: usize) -> Array<A, D>
 //     where A: Copy, S: Data<Elem = A>, D: RemoveAxis
 
-/// iterativelly recompute the `centroids` til convergence (with `epsilon` error
-/// tolerance), or til `max_iter` is reached. rows in `data` should be normalized
-/// unit vectors. when `data` has shape `(_, d)`, `centroids` has shape `(k, d)`.
+/// iterativelly recompute the `centroids` til convergence (down to `epsilon`),
+/// or til `max_iter` is reached. rows in `data` should be normalized unit
+/// vectors. when `data` has shape `(_, d)`, `centroids` has shape `(k, d)`.
 pub fn kmeans<S>(data: &Matrix<S>,
                  mut centroids: Array2<f32>,
                  epsilon: f32, max_iter: usize, verbose: bool) -> Array2<f32>
@@ -40,8 +40,8 @@ pub fn kmeans<S>(data: &Matrix<S>,
 {
     let total_rows = data.rows() as isize;
     let batch_size = (500 * 1024 * 1024 * 8) / (32 * centroids.rows()) as isize;
-    // batched processing, much faster than going through each row separately,
-    // but also limit the additional memory usage to 500 mb here.
+    // batched processing is much faster than iterating through the rows, and
+    // also limits the additional memory usage to 500 mb here.
     for i in 0..max_iter {
         if verbose { println!("iteration {} ...", i+1);}
         let new_centroids = {
