@@ -39,28 +39,30 @@ pub fn kmeans<S>(data: &Matrix<S>,
                  epsilon: f32, iter_max: usize, verbose: bool) -> Array2<f32>
     where S: Data<Elem = f32>
 {
-    let (k, d) = centroids.dim();
     let n = data.rows() as isize;
-    let b = (250 * 1024 * 1024 * 8) / (32 * k) as isize;
+    let b = (500 * 1024 * 1024 * 8) / (32 * centroids.rows()) as isize;
     // batched processing, much faster than going through each row separately,
-    // but also limit the additional memory usage to 250 mb here.
+    // but also limit the additional memory usage to 500 mb here.
     for i in 0..iter_max {
         if verbose { println!("iteration {} ...", i+1);}
         let new_centroids = {
-            let mut cb = CentroidBuilder::new(k, d);
+            let mut new_centroids = Array2::zeros(centroids.dim());
             let mut i = 0;
             while i < n {
-                let j = min(i + b, n);
+                let j = min(n, i + b);
                 let batch = data.slice(s![i..j, ..]);
                 for (i, v) in centroids
                     .dot(&batch.t())
                     .map_axis(Axis(0), |v| arg_max(&v))
                     .into_iter()
                     .zip(batch.outer_iter())
-                { cb.inc(*i, &v);}
+                { new_centroids.row_mut(*i) + &v;}
                 i = j;
             }
-            cb.build(verbose)
+            for ref mut v in new_centroids.outer_iter_mut() {
+                normalize(v);
+            }
+            new_centroids
         };
         if verbose {
             let (mean, var) = {
@@ -114,38 +116,4 @@ pub fn distance<S1, S2>(v1: &Vector<S1>, v2: &Vector<S2>) -> f32
     where S1: Data<Elem = f32>,  S2: Data<Elem = f32> {
     let diff = v1 - v2;
     diff.dot(&diff).sqrt()
-}
-
-#[derive(Debug,Default,Clone,PartialEq)]
-struct CentroidBuilder {
-    acc: Array2<f32>,
-    cnt: Array1<f32>
-}
-
-impl CentroidBuilder {
-    fn new(k: usize, d: usize) -> Self {
-        CentroidBuilder {
-            acc: Array2::<f32>::zeros((k, d)),
-            cnt: Array1::<f32>::zeros(k)
-        }
-    }
-
-    fn inc<S>(&mut self, i: usize, v: &Vector<S>) where S: Data<Elem = f32> {
-        self.cnt[i] += 1.0;
-        self.acc.row_mut(i) + &v;
-    }
-
-    fn build(mut self, verbose: bool) -> Array2<f32> {
-        for (mut v, (i, n)) in self.acc.outer_iter_mut().zip(self.cnt.indexed_iter()) {
-            if *n == 0.0 {
-                if verbose {
-                    println!("cluster {} is uninhabited. its centroid is now the origin.", i)
-                }
-            } else {
-                v /= *n;
-                normalize(&mut v);
-            }
-        }
-        self.acc
-    }
 }
