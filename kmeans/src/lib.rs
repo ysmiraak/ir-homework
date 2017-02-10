@@ -5,7 +5,7 @@
 extern crate ndarray;
 
 use std::f32;
-use std::cmp::min;
+use std::cmp::{min, max};
 use ndarray::{ArrayBase, Array, Array1, Array2, Axis, RemoveAxis, Ix1, Ix2, Data, DataMut};
 
 /// ArrayBase1
@@ -39,7 +39,7 @@ pub fn kmeans<S>(data: &Matrix<S>,
     where S: Data<Elem = f32>
 {
     let total_rows = data.rows() as isize;
-    let batch_size = (500 * 1024 * 1024 * 8) / (32 * centroids.rows()) as isize;
+    let batch_size = max(1, (500 * 1024 * 1024 * 8) / (32 * centroids.rows()) as isize);
     // batched processing is much faster than iterating through the rows, and
     // also limits the additional memory usage to 500 mb here.
     for i in 0..max_iter {
