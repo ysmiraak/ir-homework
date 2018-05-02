@@ -1,4 +1,4 @@
-tmp/
-**/.DS_Store
-**/target
-**/Cargo.lock
+.DS_Store
+Cargo.lock
+/doc
+/target
